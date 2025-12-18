@@ -1,7 +1,9 @@
 package com.example.myapplication.ui.screens
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -10,100 +12,339 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
-import com.example.myapplication.ui.components.TaskCard
 import com.example.myapplication.ui.theme.NeumorphicColors
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun CalendarScreen(tasks: List<Task>, onTaskToggle: (Int) -> Unit, onTaskDelete: (Int) -> Unit) {
+fun CalendarScreen(
+    tasks: List<Task>,
+    onTaskToggle: (Int) -> Unit,
+    onTaskDelete: (Int) -> Unit
+) {
     var selectedMonth by remember { mutableStateOf(YearMonth.now()) }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Lịch", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
+    // Compact sheet state (collapsed or expanded)
+    var sheetExpanded by remember { mutableStateOf(false) }
 
-        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) { Icon(Icons.Default.KeyboardArrowLeft, "Prev", tint = NeumorphicColors.textPrimary) }
-            Text(selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = NeumorphicColors.textPrimary)
-            IconButton(onClick = { selectedMonth = selectedMonth.plusMonths(1) }) { Icon(Icons.Default.KeyboardArrowRight, "Next", tint = NeumorphicColors.textPrimary) }
+    // group tasks by date (derived for performance) - ignore tasks without a dueDate so keys are non-null
+    val tasksByDate by remember(tasks) { derivedStateOf { tasks.filter { it.dueDate != null }.groupBy { it.dueDate!! } } }
+
+    Column(modifier = Modifier.fillMaxSize().background(NeumorphicColors.background)) {
+        // Header: day string and month selector (high info density)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val today = selectedDate ?: LocalDate.now()
+            Column {
+                Text(
+                    text = today.format(DateTimeFormatter.ofPattern("EEEE, d MMM")),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NeumorphicColors.textPrimary
+                )
+                Text(
+                    text = "${(tasksByDate[selectedDate] ?: emptyList()).size} công việc",
+                    fontSize = 12.sp,
+                    color = NeumorphicColors.textSecondary
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) {
+                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Prev", tint = NeumorphicColors.textPrimary)
+                }
+                Text(
+                    text = selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                    fontSize = 14.sp,
+                    color = NeumorphicColors.textPrimary
+                )
+                IconButton(onClick = { selectedMonth = selectedMonth.plusMonths(1) }) {
+                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next", tint = NeumorphicColors.textPrimary)
+                }
+            }
         }
-        CalendarGrid(selectedMonth, tasks, selectedDate) { selectedDate = it }
-        Spacer(Modifier.height(12.dp))
-        selectedDate?.let { date ->
-            Text("Công việc ngày ${date.format(DateTimeFormatter.ofPattern("d MMM"))}", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(bottom = 16.dp))
-            val dateTasks = tasks.filter { it.dueDate == date }
-            if (dateTasks.isEmpty()) Text("Không có việc", fontSize = 14.sp, color = NeumorphicColors.textSecondary)
-            else LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) { items(dateTasks, key = { it.id }) { task -> TaskCard(task, { onTaskToggle(task.id) }, { onTaskDelete(task.id) }) } }
+
+        // Compact month grid
+        CompactMonthGrid(
+            yearMonth = selectedMonth,
+            tasksByDate = tasksByDate,
+            selectedDate = selectedDate,
+            onSelectDate = { selectedDate = it },
+            onToggleMonth = { /* no-op; month selector is above */ }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Draggable/lightweight sheet area for tasks
+        val collapsedHeight = 140.dp
+        val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+        val expandedHeight = maxOf(screenHeightDp - 80.dp, 220.dp)
+        val targetHeight = if (sheetExpanded) expandedHeight else collapsedHeight
+        val animatedHeight by animateDpAsState(targetHeight)
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(animatedHeight)
+                .padding(horizontal = 12.dp)
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .background(NeumorphicColors.surface)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { change, dragAmount ->
+                        // simple toggle on drag up/down threshold
+                        if (dragAmount < -20) sheetExpanded = true
+                        if (dragAmount > 20) sheetExpanded = false
+                        change.consume()
+                    }
+                }
+        ) {
+            // draggable handle
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
+                    .size(width = 40.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(NeumorphicColors.textSecondary.copy(alpha = 0.28f))
+                    .clickable { sheetExpanded = !sheetExpanded }
+            )
+
+            // Task list body
+            Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp, bottom = 8.dp)) {
+                val date = selectedDate ?: LocalDate.now()
+                val dayTasks = remember(tasksByDate, date) { tasksByDate[date] ?: emptyList() }
+
+                if (dayTasks.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Không có việc trong ngày này", color = NeumorphicColors.textSecondary)
+                    }
+                } else {
+                    LazyColumn(
+                        Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(items = dayTasks, key = { it.id }) { task ->
+                            CompactTaskItem(
+                                task = task,
+                                onToggle = { onTaskToggle(task.id) },
+                                onDelete = { onTaskDelete(task.id) }
+                            )
+                            Divider(color = NeumorphicColors.background.copy(alpha = 0.12f), thickness = 0.5.dp)
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun CalendarGrid(yearMonth: YearMonth, tasks: List<Task>, selectedDate: LocalDate?, onDateSelected: (LocalDate) -> Unit) {
-    val firstDay = yearMonth.atDay(1); val days = yearMonth.lengthOfMonth(); val startDay = firstDay.dayOfWeek.value % 7
-    Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { listOf("CN", "T2", "T3", "T4", "T5", "T6", "T7").forEach { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) } }
-        Spacer(Modifier.height(12.dp))
-        LazyVerticalGrid(GridCells.Fixed(7), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val startList = List(startDay) { it }
-            val dayList = (1..days).toList()
-            items(startList, key = { "pad_${it}" }) { Box(Modifier.aspectRatio(1f)) }
-            items(items = dayList, key = { day -> yearMonth.atDay(day).toEpochDay() }) { day ->
-                val date = yearMonth.atDay(day)
-                val isSelected = date == selectedDate
-                val isToday = date == LocalDate.now()
-                val hasTasks = tasks.any { it.dueDate == date }
+private fun CompactMonthGrid(
+    yearMonth: YearMonth,
+    tasksByDate: Map<LocalDate, List<Task>>,
+    selectedDate: LocalDate?,
+    onSelectDate: (LocalDate) -> Unit,
+    onToggleMonth: () -> Unit
+) {
+    val firstOfMonth = yearMonth.atDay(1)
+    val daysInMonth = yearMonth.lengthOfMonth()
+    val startOffset = (firstOfMonth.dayOfWeek.value % 7) // Sunday=0
+    val dayList = (1..daysInMonth).toList()
 
-                // Only use a Card when there is a visual reason (selected, today or has tasks).
-                // Otherwise render a lightweight Box to reduce allocations and improve performance.
-                if (isSelected || isToday || hasTasks) {
-                    Card(
-                        modifier = Modifier.aspectRatio(1f).clickable { onDateSelected(date) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.accentBlue else if (isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
-                    ) {
-                        val lunar = com.example.myapplication.model.LunarUtils.getLunarDisplay(date)
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(day.toString(), fontSize = 14.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary)
-                                Spacer(Modifier.height(2.dp))
-                                Text(lunar, fontSize = 10.sp, color = NeumorphicColors.textSecondary)
-                                if (hasTasks) Box(Modifier.size(6.dp).clip(CircleShape).background(NeumorphicColors.accentPeach))
-                            }
-                        }
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1f)
-                            .clickable { onDateSelected(date) }
-                            .background(NeumorphicColors.surface, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(day.toString(), fontSize = 14.sp, color = NeumorphicColors.textPrimary)
-                    }
+    // Precompute indicators map: date -> set of priorities present
+    val indicators by remember(tasksByDate, yearMonth) {
+        derivedStateOf {
+            val map = mutableMapOf<Int, Set<Priority>>()
+            for (d in 1..daysInMonth) {
+                val date = yearMonth.atDay(d)
+                val priorities = tasksByDate[date]?.map { it.priority }?.toSet() ?: emptySet()
+                if (priorities.isNotEmpty()) map[d] = priorities
+            }
+            map
+        }
+    }
+
+    Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf("CN", "T2", "T3", "T4", "T5", "T6", "T7").forEach { dow ->
+                Text(
+                    text = dow,
+                    fontSize = 12.sp,
+                    color = NeumorphicColors.textSecondary,
+                    modifier = Modifier.weight(1f),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // compute number of rows needed for the month (including leading padding)
+        val totalCells = startOffset + daysInMonth
+        val rows = (totalCells + 6) / 7 // integer ceil
+        val cellSize = 36.dp
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(7),
+            modifier = Modifier.height((cellSize * rows) + (4.dp * (rows - 1))),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            content = {
+                // leading padding cells
+                val padList = List(startOffset) { it }
+                items(padList, key = { "pad_$it" }) { Box(Modifier.aspectRatio(1f)) }
+
+                // day cells
+                items(items = dayList, key = { d -> yearMonth.atDay(d).toEpochDay() }) { day ->
+                    val date = yearMonth.atDay(day)
+                    val isSelected = date == selectedDate
+                    val isToday = date == LocalDate.now()
+                    val priorities = indicators[day] ?: emptySet()
+
+                    CalendarDayCell(
+                        day = day,
+                        isSelected = isSelected,
+                        isToday = isToday,
+                        priorities = priorities,
+                        onClick = { onSelectDate(date) }
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    day: Int,
+    isSelected: Boolean,
+    isToday: Boolean,
+    priorities: Set<Priority>,
+    onClick: () -> Unit
+) {
+    // Minimal surfaces; only use elevation when necessary and keep it tiny
+    val accent = NeumorphicColors.accentBlue
+    val containerColor = when {
+        isSelected -> accent
+        isToday -> NeumorphicColors.accentMint.copy(0.12f)
+        else -> NeumorphicColors.surface
+    }
+
+    Box(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        // Day number (selected has white text)
+        Text(
+            text = day.toString(),
+            fontSize = 13.sp,
+            fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else NeumorphicColors.textPrimary
+        )
+
+        // Event indicators - small dots under the date number
+        if (priorities.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Show priority dots: RED for HIGH, BLUE for NORMAL. Show up to 2 dots.
+                if (Priority.HIGH in priorities) Dot(color = NeumorphicColors.accentPeach) // red/peach
+                if (Priority.NORMAL in priorities) Dot(color = NeumorphicColors.accentBlue)
+                if (Priority.LOW in priorities && priorities.size == 1) Dot(color = NeumorphicColors.accentMint)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Dot(color: androidx.compose.ui.graphics.Color) {
+    Box(
+        Modifier
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(color)
+    )
+}
+
+@Composable
+private fun CompactTaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
+    // Slim list tile: left time (if none -> small placeholder), middle title + meta, right checkbox
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left: time (we only have date in Task; show 'All day' as compact label)
+        Text(
+            text = "All day",
+            fontSize = 12.sp,
+            color = NeumorphicColors.textSecondary,
+            modifier = Modifier.width(64.dp),
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(task.title, fontSize = 14.sp, color = NeumorphicColors.textPrimary, fontWeight = FontWeight.Medium)
+            Spacer(modifier = Modifier.height(2.dp))
+            // Secondary meta: show priority + maybe collection id if available
+            val meta = buildString {
+                append(when (task.priority) {
+                    Priority.HIGH -> "Cao"
+                    Priority.NORMAL -> "Bình thường"
+                    Priority.LOW -> "Thấp"
+                })
+                if (task.collectionId != null) append(" • Danh mục ${task.collectionId}")
+            }
+            Text(meta, fontSize = 12.sp, color = NeumorphicColors.textSecondary)
+        }
+
+        // Right: subtle checkbox (small Card)
+        Card(
+            modifier = Modifier.size(28.dp),
+            shape = RoundedCornerShape(6.dp),
+            colors = CardDefaults.cardColors(containerColor = if (task.isCompleted) NeumorphicColors.accentMint else NeumorphicColors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize().clickable { onToggle() }, contentAlignment = Alignment.Center) {
+                if (task.isCompleted) {
+                    Icon(Icons.Default.Check, contentDescription = "Done", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(16.dp))
                 }
             }
         }
