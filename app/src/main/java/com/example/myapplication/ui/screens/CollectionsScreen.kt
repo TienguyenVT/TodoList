@@ -29,8 +29,8 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 @Composable
 fun CollectionsScreen(collections: List<Collection>, tasks: List<Task>, onCollectionClick: (Collection) -> Unit, onAddCollection: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(Modifier.height(40.dp))
-        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Danh mục", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary)
             IconButton(onClick = onAddCollection) { Icon(Icons.Default.Add, "Thêm", tint = NeumorphicColors.textPrimary) }
         }
@@ -67,8 +67,8 @@ fun CollectionCard(collection: Collection, count: Int, completed: Int, onClick: 
 fun CollectionDetailView(collection: Collection, tasks: List<Task>, onDismiss: () -> Unit, onTaskToggle: (Int) -> Unit, onTaskDelete: (Int) -> Unit) {
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(40.dp))
-            Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.Default.ArrowBack, "Back", tint = NeumorphicColors.textPrimary) }
                 Text(collection.name, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary); Spacer(Modifier.width(48.dp))
             }

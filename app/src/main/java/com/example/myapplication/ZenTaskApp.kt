@@ -39,12 +39,18 @@ fun ZenTaskApp() {
         com.example.myapplication.model.Collection(2, "Học tập", NeumorphicColors.accentLavender, Icons.Default.Star)
     )) }
 
+    // Memoize filtered lists to avoid re-filtering on every recomposition/navigation
+    val todayTasks by remember(tasks) { derivedStateOf { tasks.filter { it.dueDate == LocalDate.now() } } }
+    val tasksBySelectedCollection by remember(tasks, selectedCollection) { derivedStateOf {
+        selectedCollection?.let { col -> tasks.filter { it.collectionId == col.id } } ?: emptyList()
+    } }
+
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 when (currentScreen) {
                     NavigationItem.MY_DAY -> MyDayScreen(
-                        tasks.filter { it.dueDate == LocalDate.now() },
+                        todayTasks,
                         { id -> tasks = tasks.map { if (it.id == id) it.copy(isCompleted = !it.isCompleted) else it } },
                         { id -> tasks = tasks.filter { it.id != id } }
                     )
@@ -93,7 +99,7 @@ fun ZenTaskApp() {
         selectedCollection?.let { collection ->
             CollectionDetailView(
                 collection,
-                tasks.filter { it.collectionId == collection.id },
+                tasksBySelectedCollection,
                 { selectedCollection = null },
                 { id -> tasks = tasks.map { if (it.id == id) it.copy(isCompleted = !it.isCompleted) else it } },
                 { id -> tasks = tasks.filter { it.id != id } }

@@ -38,8 +38,8 @@ fun CalendarScreen(tasks: List<Task>, onTaskToggle: (Int) -> Unit, onTaskDelete:
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(modifier = Modifier.height(40.dp))
-        Text("Lịch", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Lịch", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
 
         Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) { Icon(Icons.Default.KeyboardArrowLeft, "Prev", tint = NeumorphicColors.textPrimary) }
@@ -47,7 +47,7 @@ fun CalendarScreen(tasks: List<Task>, onTaskToggle: (Int) -> Unit, onTaskDelete:
             IconButton(onClick = { selectedMonth = selectedMonth.plusMonths(1) }) { Icon(Icons.Default.KeyboardArrowRight, "Next", tint = NeumorphicColors.textPrimary) }
         }
         CalendarGrid(selectedMonth, tasks, selectedDate) { selectedDate = it }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(12.dp))
         selectedDate?.let { date ->
             Text("Công việc ngày ${date.format(DateTimeFormatter.ofPattern("d MMM"))}", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(bottom = 16.dp))
             val dateTasks = tasks.filter { it.dueDate == date }
@@ -64,9 +64,11 @@ fun CalendarGrid(yearMonth: YearMonth, tasks: List<Task>, selectedDate: LocalDat
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { listOf("CN", "T2", "T3", "T4", "T5", "T6", "T7").forEach { Text(it, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) } }
         Spacer(Modifier.height(12.dp))
         LazyVerticalGrid(GridCells.Fixed(7), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(startDay) { Box(Modifier.aspectRatio(1f)) }
-            items(days) { day ->
-                val date = yearMonth.atDay(day + 1)
+            val startList = List(startDay) { it }
+            val dayList = (1..days).toList()
+            items(startList, key = { "pad_${it}" }) { Box(Modifier.aspectRatio(1f)) }
+            items(items = dayList, key = { day -> yearMonth.atDay(day).toEpochDay() }) { day ->
+                val date = yearMonth.atDay(day)
                 val isSelected = date == selectedDate; val isToday = date == LocalDate.now(); val hasTasks = tasks.any { it.dueDate == date }
                 Box(Modifier.aspectRatio(1f).shadow(if(isSelected) 0.dp else 6.dp, RoundedCornerShape(12.dp)).background(if(isSelected) NeumorphicColors.accentBlue else if(isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface, RoundedCornerShape(12.dp)).clickable{onDateSelected(date)}, contentAlignment = Alignment.Center) {
                     val lunar = com.example.myapplication.model.LunarUtils.getLunarDisplay(date)

@@ -21,6 +21,14 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            isMinifyEnabled = false // Debug thì tắt đi cho nhanh build
+        }
+        getByName("release") {
+            isMinifyEnabled = true // Bật tối ưu hóa code
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

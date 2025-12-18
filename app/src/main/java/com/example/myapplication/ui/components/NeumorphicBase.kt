@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -19,15 +21,17 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 
 @Composable
 fun NeumorphicCard(isPressed: Boolean = false, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(
-        modifier = modifier
-            .shadow(if (isPressed) 0.dp else 10.dp, RoundedCornerShape(20.dp), ambientColor = NeumorphicColors.darkShadow, spotColor = NeumorphicColors.lightShadow)
-            .background(
-                if (isPressed) Brush.linearGradient(listOf(NeumorphicColors.darkShadow.copy(0.1f), NeumorphicColors.lightShadow.copy(0.1f)))
-                else Brush.linearGradient(listOf(NeumorphicColors.surface, NeumorphicColors.surface)),
-                RoundedCornerShape(20.dp)
-            )
-    ) { content() }
+    // Use Material3 Card with adjusted elevation and surface color to achieve Neumorphic look
+    Card(
+        modifier = modifier,
+        shape = NeumorphicAssets.cardShape,
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isPressed) 0.dp else 6.dp)
+    ) {
+        Box(Modifier.background(if (isPressed) NeumorphicAssets.cardPressedBrush else NeumorphicAssets.cardBrush, NeumorphicAssets.cardShape)) {
+            content()
+        }
+    }
 }
 
 @Composable
