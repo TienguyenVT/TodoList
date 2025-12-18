@@ -1,5 +1,7 @@
 package com.example.myapplication
 
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -7,14 +9,19 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.* // Import này chứa getValue và setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.local.db.TodoDatabase
 import com.example.myapplication.data.local.db.entity.Task as DbTask
+import com.example.myapplication.data.local.db.entity.TaskGroup as DbTaskGroup
 import com.example.myapplication.model.*
 import com.example.myapplication.ui.components.NeumorphicBottomNav
 import com.example.myapplication.ui.components.NeumorphicFAB
@@ -34,17 +41,22 @@ fun ZenTaskApp() {
     var showAddCollectionSheet by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val tag = "ZenTaskApp"
     val coroutineScope = rememberCoroutineScope()
     val db = remember { TodoDatabase.getInstance(context.applicationContext) }
     val taskDao = remember(db) { db.taskDao() }
+    val taskGroupDao = remember(db) { db.taskGroupDao() }
 
     val dbTasks by taskDao.observeAll().collectAsState(initial = emptyList())
     val tasks by remember(dbTasks) { derivedStateOf { dbTasks.map { it.toUiTask() } } }
 
-    // Chọn collection hiện tại
-    var selectedCollection by remember { mutableStateOf<com.example.myapplication.model.Collection?>(null) }
+    val dbCollections by taskGroupDao.observeAll().collectAsState(initial = emptyList())
+    val collections by remember(dbCollections) {
+        derivedStateOf { dbCollections.map { it.toUiCollection() } }
+    }
 
-    var collections by remember { mutableStateOf(emptyList<com.example.myapplication.model.Collection>()) }
+    // Chọn collection hiện tại
+    var selectedCollection by remember { mutableStateOf<Collection?>(null) }
 
     // Stable current date that updates at midnight so 'todayTasks' refreshes automatically
     val currentDate = remember { mutableStateOf(LocalDate.now()) }
@@ -71,6 +83,17 @@ fun ZenTaskApp() {
         selectedCollection?.let { col -> tasks.filter { it.collectionId == col.id } } ?: emptyList()
     } }
 
+    LaunchedEffect(collections) {
+        val currentSelectedId = selectedCollection?.id ?: return@LaunchedEffect
+        if (collections.none { it.id == currentSelectedId }) {
+            selectedCollection = null
+        }
+    }
+
+    fun showToast(message: String) {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
@@ -79,24 +102,64 @@ fun ZenTaskApp() {
                         todayTasks,
                         { id ->
                             coroutineScope.launch {
-                                val current = taskDao.getById(id) ?: return@launch
-                                taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
+                                try {
+                                    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                                    if (current == null) {
+                                        Log.w(tag, "Toggle task failed: taskId=$id not found")
+                                        showToast("Không tìm thấy công việc")
+                                        return@launch
+                                    }
+
+                                    withContext(Dispatchers.IO) {
+                                        taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
+                                    }
+                                } catch (t: Throwable) {
+                                    Log.e(tag, "Toggle task failed: taskId=$id", t)
+                                    showToast("Lỗi khi cập nhật công việc")
+                                }
                             }
                         },
                         { id ->
-                            coroutineScope.launch { taskDao.deleteById(id) }
+                            coroutineScope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { taskDao.deleteById(id) }
+                                } catch (t: Throwable) {
+                                    Log.e(tag, "Delete task failed: taskId=$id", t)
+                                    showToast("Lỗi khi xoá công việc")
+                                }
+                            }
                         }
                     )
                     NavigationItem.CALENDAR -> CalendarScreen(
                         tasks,
                         { id ->
                             coroutineScope.launch {
-                                val current = taskDao.getById(id) ?: return@launch
-                                taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
+                                try {
+                                    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                                    if (current == null) {
+                                        Log.w(tag, "Toggle task failed: taskId=$id not found")
+                                        showToast("Không tìm thấy công việc")
+                                        return@launch
+                                    }
+
+                                    withContext(Dispatchers.IO) {
+                                        taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
+                                    }
+                                } catch (t: Throwable) {
+                                    Log.e(tag, "Toggle task failed: taskId=$id", t)
+                                    showToast("Lỗi khi cập nhật công việc")
+                                }
                             }
                         },
                         { id ->
-                            coroutineScope.launch { taskDao.deleteById(id) }
+                            coroutineScope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) { taskDao.deleteById(id) }
+                                } catch (t: Throwable) {
+                                    Log.e(tag, "Delete task failed: taskId=$id", t)
+                                    showToast("Lỗi khi xoá công việc")
+                                }
+                            }
                         }
                     )
                     NavigationItem.COLLECTIONS -> CollectionsScreen(
@@ -123,20 +186,42 @@ fun ZenTaskApp() {
             ModalBottomSheet({ showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
                 AddTaskSheet({ t, desc, d, p, c, imageUri ->
                     coroutineScope.launch {
-                        val targetCollectionId = selectedCollection?.id
-                        taskDao.upsert(
-                            DbTask(
-                                title = t,
-                                description = desc,
-                                progressNotes = null,
-                                dueDate = d?.toEpochMillis(),
-                                urlLink = null,
-                                imagePath = imageUri,
-                                status = 0,
-                                priority = p.toDbPriority(),
-                                groupId = targetCollectionId
-                            )
-                        )
+                        try {
+                            val targetCollectionId = c ?: selectedCollection?.id
+
+                            val (validatedGroupId, wasInvalidGroup) = withContext(Dispatchers.IO) {
+                                if (targetCollectionId == null) {
+                                    null to false
+                                } else {
+                                    val exists = taskGroupDao.getById(targetCollectionId) != null
+                                    if (exists) targetCollectionId to false else null to true
+                                }
+                            }
+
+                            if (wasInvalidGroup) {
+                                Log.w(tag, "Add task: groupId=$targetCollectionId not found; saving as uncategorized")
+                                showToast("Danh mục không còn tồn tại, sẽ lưu vào Không phân loại")
+                            }
+
+                            withContext(Dispatchers.IO) {
+                                taskDao.upsert(
+                                    DbTask(
+                                        title = t,
+                                        description = desc,
+                                        progressNotes = null,
+                                        dueDate = d?.toEpochMillis(),
+                                        urlLink = null,
+                                        imagePath = imageUri,
+                                        status = 0,
+                                        priority = p.toDbPriority(),
+                                        groupId = validatedGroupId
+                                    )
+                                )
+                            }
+                        } catch (t: Throwable) {
+                            Log.e(tag, "Add task failed", t)
+                            showToast("Lỗi khi thêm công việc")
+                        }
                     }
                     showAddTaskSheet = false
                 }, { showAddTaskSheet = false })
@@ -146,8 +231,23 @@ fun ZenTaskApp() {
         if (showAddCollectionSheet) {
             ModalBottomSheet({ showAddCollectionSheet = false }, containerColor = NeumorphicColors.surface) {
                 AddCollectionSheet({ n, c ->
-                    collections = collections + com.example.myapplication.model.Collection((collections.maxOfOrNull { it.id } ?: 0) + 1, n, c, Icons.Default.List)
-                    showAddCollectionSheet = false
+                    coroutineScope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                taskGroupDao.upsert(
+                                    DbTaskGroup(
+                                        groupName = n,
+                                        groupColor = c.toArgb(),
+                                        description = null
+                                    )
+                                )
+                            }
+                            showAddCollectionSheet = false
+                        } catch (t: Throwable) {
+                            Log.e(tag, "Add collection failed", t)
+                            showToast("Lỗi khi tạo danh mục")
+                        }
+                    }
                 }, { showAddCollectionSheet = false })
             }
         }
@@ -160,12 +260,32 @@ fun ZenTaskApp() {
                 { selectedCollection = null },
                 { id ->
                     coroutineScope.launch {
-                        val current = taskDao.getById(id) ?: return@launch
-                        taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
+                        try {
+                            val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                            if (current == null) {
+                                Log.w(tag, "Toggle task failed: taskId=$id not found")
+                                showToast("Không tìm thấy công việc")
+                                return@launch
+                            }
+
+                            withContext(Dispatchers.IO) {
+                                taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
+                            }
+                        } catch (t: Throwable) {
+                            Log.e(tag, "Toggle task failed: taskId=$id", t)
+                            showToast("Lỗi khi cập nhật công việc")
+                        }
                     }
                 },
                 { id ->
-                    coroutineScope.launch { taskDao.deleteById(id) }
+                    coroutineScope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { taskDao.deleteById(id) }
+                        } catch (t: Throwable) {
+                            Log.e(tag, "Delete task failed: taskId=$id", t)
+                            showToast("Lỗi khi xoá công việc")
+                        }
+                    }
                 }
             )
         }
@@ -173,7 +293,7 @@ fun ZenTaskApp() {
 }
 
 private fun DbTask.toUiTask(): Task {
-    val zone = ZoneId.systemDefault()
+    val zone = ZoneId.of("UTC")
     return Task(
         id = id,
         title = title,
@@ -203,5 +323,14 @@ private fun Priority.toDbPriority(): Int {
 }
 
 private fun LocalDate.toEpochMillis(): Long {
-    return atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    return atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+}
+
+private fun DbTaskGroup.toUiCollection(): Collection {
+    return Collection(
+        id = groupId,
+        name = groupName,
+        color = Color(groupColor),
+        icon = Icons.Default.List
+    )
 }
