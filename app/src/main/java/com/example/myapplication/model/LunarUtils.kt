@@ -112,14 +112,14 @@ object LunarUtils {
         val k = floor((dayNumber - 2415021.076998695) / 29.530588853).toInt()
         var monthStart = getNewMoonDay(k + 1, timeZone)
         if (monthStart > dayNumber) monthStart = getNewMoonDay(k, timeZone)
-        val a11 = getLunarMonth11(year, timeZone)
+        var a11 = getLunarMonth11(year, timeZone)
         var b11 = a11
         var lunarYear = year
         if (a11 >= monthStart) {
-            lunarYear = year
-            b11 = getLunarMonth11(year - 1, timeZone)
+            // monthStart is in the previous lunar year
+            a11 = getLunarMonth11(year - 1, timeZone)
         } else {
-            lunarYear = year + 1
+            // monthStart belongs to the next lunar-year boundary
             b11 = getLunarMonth11(year + 1, timeZone)
         }
         val diff = floor((monthStart - a11) / 29.0).toInt()

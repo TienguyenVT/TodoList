@@ -32,6 +32,7 @@ import com.example.myapplication.model.Task
 import com.example.myapplication.model.FestivalUtils
 import com.example.myapplication.model.Event
 import com.example.myapplication.ui.theme.NeumorphicColors
+import android.util.Log
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -108,6 +109,9 @@ fun CalendarScreen(
         val targetHeight = if (sheetExpanded) expandedHeight else collapsedHeight
         val animatedHeight by animateDpAsState(targetHeight)
 
+        // Density-aware drag threshold (20.dp converted to pixels)
+        val thresholdPx = with(LocalDensity.current) { 20.dp.toPx() }
+
         Box(
             Modifier
                 .fillMaxWidth()
@@ -116,12 +120,12 @@ fun CalendarScreen(
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .background(NeumorphicColors.surface)
                 .pointerInput(Unit) {
-                    detectVerticalDragGestures { change, dragAmount ->
-                        // simple toggle on drag up/down threshold
-                        if (dragAmount < -20) sheetExpanded = true
-                        if (dragAmount > 20) sheetExpanded = false
-                        change.consume()
-                    }
+                        detectVerticalDragGestures { change, dragAmount ->
+                            // simple toggle on drag up/down threshold (density-independent)
+                            if (dragAmount < -thresholdPx) sheetExpanded = true
+                            if (dragAmount > thresholdPx) sheetExpanded = false
+                            change.consume()
+                        }
                 }
         ) {
             // draggable handle
@@ -220,8 +224,16 @@ private fun CompactMonthGrid(
                 val date = yearMonth.atDay(d)
                 try {
                     m[d] = com.example.myapplication.model.LunarUtils.convertSolar2Lunar(date)
-                } catch (_: Exception) {
+                } catch (ex: IllegalArgumentException) {
+                    Log.e("CalendarScreen", "Lunar conversion failed for date=$date: ${ex.message}", ex)
                     m[d] = null
+                } catch (ex: ArithmeticException) {
+                    Log.e("CalendarScreen", "Lunar conversion arithmetic error for date=$date: ${ex.message}", ex)
+                    m[d] = null
+                } catch (ex: Exception) {
+                    // Unexpected exception - log and rethrow so programming errors are visible during development
+                    Log.e("CalendarScreen", "Unexpected error converting lunar for date=$date", ex)
+                    throw ex
                 }
             }
             m

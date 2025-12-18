@@ -6,6 +6,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.* // Import này chứa getValue và setValue
+import kotlinx.coroutines.delay
+import java.time.LocalDateTime
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,9 +35,22 @@ fun ZenTaskApp() {
 
     var collections by remember { mutableStateOf(emptyList<com.example.myapplication.model.Collection>()) }
 
-    // Memoize filtered lists to avoid re-filtering on every recomposition/navigation
-    val todayTasks by remember(tasks) { derivedStateOf { tasks.filter { it.dueDate == LocalDate.now() } } }
-    val tasksBySelectedCollection by remember(tasks, selectedCollection) { derivedStateOf {
+    // Stable current date that updates at midnight so 'todayTasks' refreshes automatically
+    val currentDate = remember { mutableStateOf(LocalDate.now()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = LocalDateTime.now()
+            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+            val waitMillis = java.time.Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1000)
+            delay(waitMillis)
+            currentDate.value = LocalDate.now()
+        }
+    }
+
+    // Memoize filtered lists; derivedStateOf will track snapshot reads (no extra keys required)
+    val todayTasks by remember { derivedStateOf { tasks.filter { it.dueDate == currentDate.value } } }
+    val tasksBySelectedCollection by remember { derivedStateOf {
         selectedCollection?.let { col -> tasks.filter { it.collectionId == col.id } } ?: emptyList()
     } }
 
