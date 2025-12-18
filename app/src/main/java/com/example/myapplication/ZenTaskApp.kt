@@ -22,7 +22,10 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.data.local.db.TodoDatabase
 import com.example.myapplication.data.local.db.entity.Task as DbTask
 import com.example.myapplication.data.local.db.entity.TaskGroup as DbTaskGroup
-import com.example.myapplication.model.*
+import com.example.myapplication.model.Collection as UiCollection
+import com.example.myapplication.model.NavigationItem
+import com.example.myapplication.model.Priority
+import com.example.myapplication.model.Task
 import com.example.myapplication.ui.components.NeumorphicBottomNav
 import com.example.myapplication.ui.components.NeumorphicFAB
 import com.example.myapplication.ui.screens.*
@@ -56,7 +59,7 @@ fun ZenTaskApp() {
     }
 
     // Chọn collection hiện tại
-    var selectedCollection by remember { mutableStateOf<Collection?>(null) }
+    var selectedCollection by remember { mutableStateOf<UiCollection?>(null) }
 
     // Stable current date that updates at midnight so 'todayTasks' refreshes automatically
     val currentDate = remember { mutableStateOf(LocalDate.now()) }
@@ -326,8 +329,8 @@ private fun LocalDate.toEpochMillis(): Long {
     return atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
 }
 
-private fun DbTaskGroup.toUiCollection(): Collection {
-    return Collection(
+private fun DbTaskGroup.toUiCollection(): UiCollection {
+    return UiCollection(
         id = groupId,
         name = groupName,
         color = Color(groupColor),
