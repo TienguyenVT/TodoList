@@ -69,7 +69,13 @@ fun CalendarGrid(yearMonth: YearMonth, tasks: List<Task>, selectedDate: LocalDat
                 val date = yearMonth.atDay(day + 1)
                 val isSelected = date == selectedDate; val isToday = date == LocalDate.now(); val hasTasks = tasks.any { it.dueDate == date }
                 Box(Modifier.aspectRatio(1f).shadow(if(isSelected) 0.dp else 6.dp, RoundedCornerShape(12.dp)).background(if(isSelected) NeumorphicColors.accentBlue else if(isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface, RoundedCornerShape(12.dp)).clickable{onDateSelected(date)}, contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Text((day + 1).toString(), fontSize = 14.sp, fontWeight = if(isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary); if(hasTasks) Box(Modifier.size(4.dp).clip(CircleShape).background(NeumorphicColors.accentPeach)) }
+                    val lunar = com.example.myapplication.model.LunarUtils.getLunarDisplay(date)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text((day + 1).toString(), fontSize = 14.sp, fontWeight = if(isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary)
+                        Spacer(Modifier.height(2.dp))
+                        Text(lunar, fontSize = 10.sp, color = NeumorphicColors.textSecondary)
+                        if(hasTasks) Box(Modifier.size(4.dp).clip(CircleShape).background(NeumorphicColors.accentPeach))
+                    }
                 }
             }
         }
