@@ -49,6 +49,12 @@ fun ZenTaskApp() {
     // Stable current date that updates at midnight so 'todayTasks' refreshes automatically
     val currentDate = remember { mutableStateOf(LocalDate.now()) }
 
+    LaunchedEffect(currentScreen) {
+        if (currentScreen != NavigationItem.COLLECTIONS) {
+            showAddTaskSheet = false
+        }
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             val now = LocalDateTime.now()
@@ -105,16 +111,19 @@ fun ZenTaskApp() {
             NeumorphicBottomNav(currentScreen) { currentScreen = it }
         }
 
-        NeumorphicFAB(
-            onClick = { showAddTaskSheet = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 90.dp)
-        )
+        if (currentScreen == NavigationItem.COLLECTIONS) {
+            NeumorphicFAB(
+                onClick = { showAddTaskSheet = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 90.dp)
+            )
+        }
 
         // Các Bottom Sheet
-        if (showAddTaskSheet) {
+        if (showAddTaskSheet && currentScreen == NavigationItem.COLLECTIONS) {
             ModalBottomSheet({ showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
                 AddTaskSheet({ t, desc, d, p, c, imageUri ->
                     coroutineScope.launch {
+                        val targetCollectionId = selectedCollection?.id
                         taskDao.upsert(
                             DbTask(
                                 title = t,
@@ -125,7 +134,7 @@ fun ZenTaskApp() {
                                 imagePath = imageUri,
                                 status = 0,
                                 priority = p.toDbPriority(),
-                                groupId = c
+                                groupId = targetCollectionId
                             )
                         )
                     }

@@ -104,7 +104,7 @@ fun CalendarScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Draggable/lightweight sheet area for tasks
-        val collapsedHeight = 470.dp
+        val collapsedHeight = 500.dp
         val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
         val expandedHeight = maxOf(screenHeightDp - 40.dp, 320.dp)
         val targetHeight = if (sheetExpanded) expandedHeight else collapsedHeight
