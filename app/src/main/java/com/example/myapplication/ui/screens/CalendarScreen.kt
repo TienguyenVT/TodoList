@@ -71,21 +71,38 @@ fun CalendarGrid(yearMonth: YearMonth, tasks: List<Task>, selectedDate: LocalDat
             items(startList, key = { "pad_${it}" }) { Box(Modifier.aspectRatio(1f)) }
             items(items = dayList, key = { day -> yearMonth.atDay(day).toEpochDay() }) { day ->
                 val date = yearMonth.atDay(day)
-                val isSelected = date == selectedDate; val isToday = date == LocalDate.now(); val hasTasks = tasks.any { it.dueDate == date }
-                Card(
-                    modifier = Modifier.aspectRatio(1f).clickable { onDateSelected(date) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.accentBlue else if (isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
-                ) {
-                    val lunar = com.example.myapplication.model.LunarUtils.getLunarDisplay(date)
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text((day).toString(), fontSize = 14.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary)
-                            Spacer(Modifier.height(2.dp))
-                            Text(lunar, fontSize = 10.sp, color = NeumorphicColors.textSecondary)
-                            if (hasTasks) Box(Modifier.size(4.dp).clip(CircleShape).background(NeumorphicColors.accentPeach))
+                val isSelected = date == selectedDate
+                val isToday = date == LocalDate.now()
+                val hasTasks = tasks.any { it.dueDate == date }
+
+                // Only use a Card when there is a visual reason (selected, today or has tasks).
+                // Otherwise render a lightweight Box to reduce allocations and improve performance.
+                if (isSelected || isToday || hasTasks) {
+                    Card(
+                        modifier = Modifier.aspectRatio(1f).clickable { onDateSelected(date) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.accentBlue else if (isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
+                    ) {
+                        val lunar = com.example.myapplication.model.LunarUtils.getLunarDisplay(date)
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(day.toString(), fontSize = 14.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary)
+                                Spacer(Modifier.height(2.dp))
+                                Text(lunar, fontSize = 10.sp, color = NeumorphicColors.textSecondary)
+                                if (hasTasks) Box(Modifier.size(6.dp).clip(CircleShape).background(NeumorphicColors.accentPeach))
+                            }
                         }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clickable { onDateSelected(date) }
+                            .background(NeumorphicColors.surface, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(day.toString(), fontSize = 14.sp, color = NeumorphicColors.textPrimary)
                     }
                 }
             }
