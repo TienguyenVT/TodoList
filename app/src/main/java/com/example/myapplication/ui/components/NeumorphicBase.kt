@@ -36,24 +36,29 @@ fun NeumorphicCard(isPressed: Boolean = false, modifier: Modifier = Modifier, co
 
 @Composable
 fun NeumorphicButton(text: String, onClick: () -> Unit) {
-    Box(
-        Modifier.fillMaxWidth().shadow(8.dp, RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(NeumorphicColors.accentBlue, NeumorphicColors.accentBlue.copy(0.8f))), RoundedCornerShape(16.dp))
-            .clickable { onClick() }.padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.accentBlue),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Text(text, color = NeumorphicColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(NeumorphicColors.accentBlue, NeumorphicColors.accentBlue.copy(0.8f)))).padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+            Text(text, color = NeumorphicColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
 @Composable
 fun NeumorphicTextField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
-    Box(
-        Modifier.fillMaxWidth().shadow(0.dp, RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(NeumorphicColors.darkShadow.copy(0.1f), NeumorphicColors.lightShadow.copy(0.05f))), RoundedCornerShape(16.dp))
-            .padding(16.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        if (value.isEmpty()) Text(placeholder, color = NeumorphicColors.textSecondary, fontSize = 16.sp)
-        BasicTextField(value = value, onValueChange = onValueChange, textStyle = TextStyle(color = NeumorphicColors.textPrimary, fontSize = 16.sp), modifier = Modifier.fillMaxWidth())
+        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(NeumorphicColors.darkShadow.copy(0.1f), NeumorphicColors.lightShadow.copy(0.05f)))).padding(16.dp)) {
+            if (value.isEmpty()) Text(placeholder, color = NeumorphicColors.textSecondary, fontSize = 16.sp)
+            BasicTextField(value = value, onValueChange = onValueChange, textStyle = TextStyle(color = NeumorphicColors.textPrimary, fontSize = 16.sp), modifier = Modifier.fillMaxWidth())
+        }
     }
 }

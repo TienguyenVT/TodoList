@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -31,10 +33,15 @@ fun AddTaskSheet(onAddTask: (String, LocalDate?, Priority, Int?) -> Unit, onDism
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             Priority.entries.forEach { p ->
                 val isSelected = priority == p
-                Box(Modifier.shadow(if (isSelected) 0.dp else 6.dp, RoundedCornerShape(12.dp))
-                    .background(if (isSelected) NeumorphicColors.darkShadow.copy(0.15f) else NeumorphicColors.surface, RoundedCornerShape(12.dp))
-                    .clickable { priority = p }.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                    Text(p.name, color = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                Card(
+                    modifier = Modifier.clickable { priority = p }.padding(horizontal = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.darkShadow.copy(0.15f) else NeumorphicColors.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
+                ) {
+                    Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        Text(p.name, color = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                    }
                 }
             }
         }

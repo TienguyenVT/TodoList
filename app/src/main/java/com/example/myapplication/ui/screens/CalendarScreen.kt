@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -70,13 +72,20 @@ fun CalendarGrid(yearMonth: YearMonth, tasks: List<Task>, selectedDate: LocalDat
             items(items = dayList, key = { day -> yearMonth.atDay(day).toEpochDay() }) { day ->
                 val date = yearMonth.atDay(day)
                 val isSelected = date == selectedDate; val isToday = date == LocalDate.now(); val hasTasks = tasks.any { it.dueDate == date }
-                Box(Modifier.aspectRatio(1f).shadow(if(isSelected) 0.dp else 6.dp, RoundedCornerShape(12.dp)).background(if(isSelected) NeumorphicColors.accentBlue else if(isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface, RoundedCornerShape(12.dp)).clickable{onDateSelected(date)}, contentAlignment = Alignment.Center) {
+                Card(
+                    modifier = Modifier.aspectRatio(1f).clickable { onDateSelected(date) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.accentBlue else if (isToday) NeumorphicColors.accentMint.copy(0.5f) else NeumorphicColors.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
+                ) {
                     val lunar = com.example.myapplication.model.LunarUtils.getLunarDisplay(date)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text((day + 1).toString(), fontSize = 14.sp, fontWeight = if(isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary)
-                        Spacer(Modifier.height(2.dp))
-                        Text(lunar, fontSize = 10.sp, color = NeumorphicColors.textSecondary)
-                        if(hasTasks) Box(Modifier.size(4.dp).clip(CircleShape).background(NeumorphicColors.accentPeach))
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text((day).toString(), fontSize = 14.sp, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal, color = NeumorphicColors.textPrimary)
+                            Spacer(Modifier.height(2.dp))
+                            Text(lunar, fontSize = 10.sp, color = NeumorphicColors.textSecondary)
+                            if (hasTasks) Box(Modifier.size(4.dp).clip(CircleShape).background(NeumorphicColors.accentPeach))
+                        }
                     }
                 }
             }

@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,8 +51,15 @@ fun CollectionCard(collection: Collection, count: Int, completed: Int, onClick: 
     NeumorphicCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(48.dp).shadow(6.dp, CircleShape).background(collection.color, CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(collection.icon, collection.name, tint = NeumorphicColors.textPrimary, modifier = Modifier.size(24.dp))
+                Card(
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    colors = CardDefaults.cardColors(containerColor = collection.color),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(collection.icon, collection.name, tint = NeumorphicColors.textPrimary, modifier = Modifier.size(24.dp))
+                    }
                 }
                 Spacer(Modifier.width(16.dp))
                 Column {
