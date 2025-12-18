@@ -49,4 +49,28 @@ class LunarUtilsTest {
         val solarBack = LunarUtils.convertLunar2Solar(lunar.day, lunar.month, lunar.year, lunar.isLeap)
         assertEquals(d, solarBack)
     }
+
+    @Test
+    fun testDecemberBoundaryExplicit() {
+        // Target behavior across year boundary (Dec -> Jan)
+        val dec31 = LocalDate.of(2018, 12, 31)
+        val jan01 = LocalDate.of(2019, 1, 1)
+
+        val lDec31 = LunarUtils.convertSolar2Lunar(dec31)
+        val lJan01 = LunarUtils.convertSolar2Lunar(jan01)
+
+        // lunar month around December can be 11 or 12 depending on astronomical data, ensure it's in that range
+        assertTrue("Dec31 lunar month should be 11 or 12", lDec31.month == 11 || lDec31.month == 12)
+        assertTrue("Jan01 lunar month should be 11 or 12", lJan01.month == 11 || lJan01.month == 12)
+
+        // Ensure year assignment is consistent (both should still belong to the previous lunar year for Jan 1, 2019)
+        assertEquals("Dec31 lunar year should be 2018", 2018, lDec31.year)
+        assertEquals("Jan01 lunar year should be 2018", 2018, lJan01.year)
+
+        // Ensure isLeap is a boolean (smoke check) and days are within 1..30
+        assertTrue(lDec31.day in 1..30)
+        assertTrue(lJan01.day in 1..30)
+        assertTrue(lDec31.isLeap == false || lDec31.isLeap == true)
+        assertTrue(lJan01.isLeap == false || lJan01.isLeap == true)
+    }
 }

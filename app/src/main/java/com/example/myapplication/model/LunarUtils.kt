@@ -1,5 +1,6 @@
 package com.example.myapplication.model
 
+import android.util.Log
 import java.time.LocalDate
 import kotlin.math.*
 
@@ -173,13 +174,14 @@ object LunarUtils {
         return try {
             val l = convertSolar2Lunar(date)
             val leapStr = if (l.isLeap) " (N)" else ""
-            String.format("%d/%02d%s", l.day, l.month, leapStr)
+            "${l.day}/${l.month.toString().padStart(2, '0')}$leapStr"
         } catch (ex: Exception) {
-            // Fallback to the old lightweight approximation if something goes wrong
+            // Log the failure and fallback to the old lightweight approximation
+            Log.e("LunarUtils", "convertSolar2Lunar failed for date: $date", ex)
             val epoch = date.toEpochDay()
             val lDay = ((epoch + 40) % 30 + 30) % 30 + 1
             val lMonth = (((date.monthValue - 1) + ((epoch / 30) % 12).toInt()) % 12 + 12) % 12 + 1
-            String.format("%02d/%02d", lDay, lMonth)
+            "${lDay.toString().padStart(2, '0')}/${lMonth.toString().padStart(2, '0')}"
         }
     }
 }
