@@ -10,5 +10,7 @@ data class Task(
     val dueDate: LocalDate? = null,
     val priority: Priority = Priority.NORMAL,
     var isCompleted: Boolean = false,
-    val collectionId: Int? = null
+    val collectionId: Int? = null,
+    val description: String? = null,
+    val imageUri: String? = null
 )

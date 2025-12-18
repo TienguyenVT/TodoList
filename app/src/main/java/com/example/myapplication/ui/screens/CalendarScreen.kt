@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -103,9 +104,9 @@ fun CalendarScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Draggable/lightweight sheet area for tasks
-        val collapsedHeight = 140.dp
+        val collapsedHeight = 470.dp
         val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-        val expandedHeight = maxOf(screenHeightDp - 80.dp, 220.dp)
+        val expandedHeight = maxOf(screenHeightDp - 40.dp, 320.dp)
         val targetHeight = if (sheetExpanded) expandedHeight else collapsedHeight
         val animatedHeight by animateDpAsState(targetHeight)
 
@@ -116,16 +117,16 @@ fun CalendarScreen(
             Modifier
                 .fillMaxWidth()
                 .height(animatedHeight)
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 6.dp)
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .background(NeumorphicColors.surface)
                 .pointerInput(Unit) {
-                        detectVerticalDragGestures { change, dragAmount ->
-                            // simple toggle on drag up/down threshold (density-independent)
-                            if (dragAmount < -thresholdPx) sheetExpanded = true
-                            if (dragAmount > thresholdPx) sheetExpanded = false
-                            change.consume()
-                        }
+                    detectVerticalDragGestures { change, dragAmount ->
+                        // simple toggle on drag up/down threshold (density-independent)
+                        if (dragAmount < -thresholdPx) sheetExpanded = true
+                        if (dragAmount > thresholdPx) sheetExpanded = false
+                        change.consume()
+                    }
                 }
         ) {
             // draggable handle
@@ -141,9 +142,15 @@ fun CalendarScreen(
 
             // Task list body
             Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp, bottom = 8.dp)) {
-                    val date = selectedDate ?: LocalDate.now()
-                    val dayTasks = remember(tasksByDate, date) { tasksByDate[date] ?: emptyList() }
-                    val dayEvents = remember(date) { FestivalUtils.getEventsForDate(date) }
+                val date = selectedDate ?: LocalDate.now()
+                val dayTasks = remember(tasksByDate, date) { tasksByDate[date] ?: emptyList() }
+                val dayEvents = remember(date) { FestivalUtils.getEventsForDate(date) }
+                val combinedItems = remember(dayEvents, dayTasks) {
+                    buildList {
+                        dayEvents.forEach { add(CalendarListItem.EventItem(it)) }
+                        dayTasks.forEach { add(CalendarListItem.TaskItem(it)) }
+                    }
+                }
 
                 if (dayTasks.isEmpty() && dayEvents.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -154,53 +161,60 @@ fun CalendarScreen(
                         Modifier.fillMaxSize().padding(horizontal = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // First show events section if present
-                        if (dayEvents.isNotEmpty()) {
-                            item {
-                                Text(
-                                    "Sự kiện",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = NeumorphicColors.textPrimary,
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                )
-                                dayEvents.forEach { ev ->
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        // sự kiện: chấm nhỏ xanh biển
+                        itemsIndexed(
+                            items = combinedItems,
+                            key = { index, item ->
+                                when (item) {
+                                    is CalendarListItem.EventItem -> "ev_${index}_${item.event.title}"
+                                    is CalendarListItem.TaskItem -> "task_${item.task.id}"
+                                }
+                            }
+                        ) { index, item ->
+                            when (item) {
+                                is CalendarListItem.EventItem -> {
+                                    Row(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Dot(color = NeumorphicColors.accentBlue)
                                         Spacer(Modifier.width(8.dp))
                                         Column {
-                                            Text(ev.title, color = NeumorphicColors.textPrimary)
-                                            ev.description?.let { Text(it, color = NeumorphicColors.textSecondary, fontSize = 12.sp) }
+                                            Text(item.event.title, color = NeumorphicColors.textPrimary)
+                                            item.event.description?.let {
+                                                Text(it, color = NeumorphicColors.textSecondary, fontSize = 12.sp)
+                                            }
                                         }
                                     }
                                 }
-                                Divider(color = NeumorphicColors.background.copy(alpha = 0.12f), thickness = 0.5.dp)
-                            }
-                        }
 
-                        if (dayTasks.isNotEmpty()) {
-                            item {
-                                Text(
-                                    "Công việc",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = NeumorphicColors.textPrimary,
-                                    modifier = Modifier.padding(vertical = 8.dp)
+                                is CalendarListItem.TaskItem -> {
+                                    CompactTaskItem(
+                                        task = item.task,
+                                        onToggle = { onTaskToggle(item.task.id) },
+                                        onDelete = { onTaskDelete(item.task.id) }
+                                    )
+                                }
+                            }
+
+                            if (index != combinedItems.lastIndex) {
+                                Divider(
+                                    color = NeumorphicColors.background.copy(alpha = 0.12f),
+                                    thickness = 0.5.dp
                                 )
                             }
-                        }
-                        items(items = dayTasks, key = { it.id }) { task ->
-                            CompactTaskItem(
-                                task = task,
-                                onToggle = { onTaskToggle(task.id) },
-                                onDelete = { onTaskDelete(task.id) }
-                            )
-                            Divider(color = NeumorphicColors.background.copy(alpha = 0.12f), thickness = 0.5.dp)
                         }
                     }
                 }
             }
         }
     }
+}
+
+private sealed interface CalendarListItem {
+    data class EventItem(val event: Event) : CalendarListItem
+    data class TaskItem(val task: Task) : CalendarListItem
 }
 
 @Composable
@@ -362,7 +376,7 @@ private fun CalendarDayCell(
             }
         }
 
-                // Event and priority indicators - small dots under the date number
+        // Event and priority indicators - small dots under the date number
         if (priorities.isNotEmpty() || events.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -370,21 +384,21 @@ private fun CalendarDayCell(
                     .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                        // priority dots (công việc người dùng đặt)
-                        if (Priority.LOW in priorities) {
-                            Dot(color = NeumorphicColors.priorityLow)      // xanh lá
-                        }
-                        if (Priority.NORMAL in priorities) {
-                            Dot(color = NeumorphicColors.priorityNormal)  // vàng
-                        }
-                        if (Priority.HIGH in priorities) {
-                            Dot(color = NeumorphicColors.priorityHigh)    // đỏ
-                        }
+                // priority dots (công việc người dùng đặt)
+                if (Priority.LOW in priorities) {
+                    Dot(color = NeumorphicColors.priorityLow)      // xanh lá
+                }
+                if (Priority.NORMAL in priorities) {
+                    Dot(color = NeumorphicColors.priorityNormal)  // vàng
+                }
+                if (Priority.HIGH in priorities) {
+                    Dot(color = NeumorphicColors.priorityHigh)    // đỏ
+                }
 
-                        // event dot: một chấm xanh biển nếu có ít nhất một sự kiện
-                        if (events.isNotEmpty()) {
-                            Dot(color = NeumorphicColors.accentBlue)
-                        }
+                // event dot: một chấm xanh biển nếu có ít nhất một sự kiện
+                if (events.isNotEmpty()) {
+                    Dot(color = NeumorphicColors.accentBlue)
+                }
             }
         }
     }
@@ -414,7 +428,7 @@ private fun CompactTaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Un
             text = "All day",
             fontSize = 12.sp,
             color = NeumorphicColors.textSecondary,
-            modifier = Modifier.width(64.dp),
+            modifier = Modifier.width(52.dp),
             fontWeight = FontWeight.SemiBold
         )
 
