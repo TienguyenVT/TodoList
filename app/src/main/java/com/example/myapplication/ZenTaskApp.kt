@@ -28,16 +28,10 @@ fun ZenTaskApp() {
     // Chọn collection hiện tại
     var selectedCollection by remember { mutableStateOf<com.example.myapplication.model.Collection?>(null) }
 
-    var tasks by remember { mutableStateOf(listOf(
-        Task(1, "Thiền buổi sáng", LocalDate.now(), Priority.HIGH, collectionId = 1),
-        Task(2, "Đi siêu thị", LocalDate.now().plusDays(1), Priority.LOW),
-        Task(3, "Học tập", LocalDate.now().plusDays(2), Priority.NORMAL, collectionId = 2)
-    )) }
+    // Start with empty dataset so user can rebuild from scratch
+    var tasks by remember { mutableStateOf(emptyList<Task>()) }
 
-    var collections by remember { mutableStateOf(listOf(
-        com.example.myapplication.model.Collection(1, "Cá nhân", NeumorphicColors.accentBlue, Icons.Default.Person),
-        com.example.myapplication.model.Collection(2, "Học tập", NeumorphicColors.accentLavender, Icons.Default.Star)
-    )) }
+    var collections by remember { mutableStateOf(emptyList<com.example.myapplication.model.Collection>()) }
 
     // Memoize filtered lists to avoid re-filtering on every recomposition/navigation
     val todayTasks by remember(tasks) { derivedStateOf { tasks.filter { it.dueDate == LocalDate.now() } } }

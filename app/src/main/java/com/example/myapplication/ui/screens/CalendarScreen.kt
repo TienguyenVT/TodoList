@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
+import com.example.myapplication.model.FestivalUtils
+import com.example.myapplication.model.Event
 import com.example.myapplication.ui.theme.NeumorphicColors
 import java.time.LocalDate
 import java.time.YearMonth
@@ -67,7 +69,7 @@ fun CalendarScreen(
                     color = NeumorphicColors.textPrimary
                 )
                 Text(
-                    text = "${(tasksByDate[selectedDate] ?: emptyList()).size} công việc",
+                    text = "${(tasksByDate[selectedDate ?: LocalDate.now()] ?: emptyList()).size} công việc",
                     fontSize = 12.sp,
                     color = NeumorphicColors.textSecondary
                 )
@@ -135,10 +137,11 @@ fun CalendarScreen(
 
             // Task list body
             Column(modifier = Modifier.fillMaxSize().padding(top = 20.dp, bottom = 8.dp)) {
-                val date = selectedDate ?: LocalDate.now()
-                val dayTasks = remember(tasksByDate, date) { tasksByDate[date] ?: emptyList() }
+                    val date = selectedDate ?: LocalDate.now()
+                    val dayTasks = remember(tasksByDate, date) { tasksByDate[date] ?: emptyList() }
+                    val dayEvents = remember(date) { FestivalUtils.getEventsForDate(date) }
 
-                if (dayTasks.isEmpty()) {
+                if (dayTasks.isEmpty() && dayEvents.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Không có việc trong ngày này", color = NeumorphicColors.textSecondary)
                     }
@@ -147,6 +150,23 @@ fun CalendarScreen(
                         Modifier.fillMaxSize().padding(horizontal = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        // First show events section if present
+                        if (dayEvents.isNotEmpty()) {
+                            item {
+                                Text("Sự kiện", fontWeight = FontWeight.SemiBold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
+                                dayEvents.forEach { ev ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Dot(color = if (ev.isLunar) NeumorphicColors.accentPeach else NeumorphicColors.accentBlue)
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text(ev.title, color = NeumorphicColors.textPrimary)
+                                            ev.description?.let { Text(it, color = NeumorphicColors.textSecondary, fontSize = 12.sp) }
+                                        }
+                                    }
+                                }
+                                Divider(color = NeumorphicColors.background.copy(alpha = 0.12f), thickness = 0.5.dp)
+                            }
+                        }
                         items(items = dayTasks, key = { it.id }) { task ->
                             CompactTaskItem(
                                 task = task,
@@ -175,7 +195,7 @@ private fun CompactMonthGrid(
     val startOffset = (firstOfMonth.dayOfWeek.value % 7) // Sunday=0
     val dayList = (1..daysInMonth).toList()
 
-    // Precompute indicators map: date -> set of priorities present
+    // Precompute indicators map: date -> set of priorities present and events present
     val indicators by remember(tasksByDate, yearMonth) {
         derivedStateOf {
             val map = mutableMapOf<Int, Set<Priority>>()
@@ -185,6 +205,26 @@ private fun CompactMonthGrid(
                 if (priorities.isNotEmpty()) map[d] = priorities
             }
             map
+        }
+    }
+
+    val eventsMap by remember(yearMonth) {
+        derivedStateOf { FestivalUtils.getEventsForMonth(yearMonth).mapKeys { entry -> entry.key.dayOfMonth } }
+    }
+
+    // Precompute lunar conversions for the month to avoid recomputing per cell
+    val lunarMap by remember(yearMonth) {
+        derivedStateOf {
+            val m = mutableMapOf<Int, com.example.myapplication.model.LunarUtils.LunarDate?>()
+            for (d in 1..daysInMonth) {
+                val date = yearMonth.atDay(d)
+                try {
+                    m[d] = com.example.myapplication.model.LunarUtils.convertSolar2Lunar(date)
+                } catch (_: Exception) {
+                    m[d] = null
+                }
+            }
+            m
         }
     }
 
@@ -209,17 +249,19 @@ private fun CompactMonthGrid(
         // compute number of rows needed for the month (including leading padding)
         val totalCells = startOffset + daysInMonth
         val rows = (totalCells + 6) / 7 // integer ceil
-        val cellSize = 36.dp
+        val cellSize = 44.dp
+        val verticalSpacing = 4.dp
+        val gridHeight = (cellSize * rows) + (verticalSpacing * (rows - 1)) + 8.dp // extra padding
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
-            modifier = Modifier.height((cellSize * rows) + (4.dp * (rows - 1))),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.height(gridHeight),
+            horizontalArrangement = Arrangement.spacedBy(verticalSpacing),
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing),
             content = {
                 // leading padding cells
                 val padList = List(startOffset) { it }
-                items(padList, key = { "pad_$it" }) { Box(Modifier.aspectRatio(1f)) }
+                items(padList, key = { "pad_$it" }) { Box(Modifier.size(cellSize)) }
 
                 // day cells
                 items(items = dayList, key = { d -> yearMonth.atDay(d).toEpochDay() }) { day ->
@@ -230,9 +272,12 @@ private fun CompactMonthGrid(
 
                     CalendarDayCell(
                         day = day,
+                        cellSize = cellSize,
                         isSelected = isSelected,
                         isToday = isToday,
                         priorities = priorities,
+                        events = eventsMap[day] ?: emptyList(),
+                        lunar = lunarMap[day],
                         onClick = { onSelectDate(date) }
                     )
                 }
@@ -244,9 +289,12 @@ private fun CompactMonthGrid(
 @Composable
 private fun CalendarDayCell(
     day: Int,
+    cellSize: androidx.compose.ui.unit.Dp,
     isSelected: Boolean,
     isToday: Boolean,
     priorities: Set<Priority>,
+    events: List<com.example.myapplication.model.Event>,
+    lunar: com.example.myapplication.model.LunarUtils.LunarDate?,
     onClick: () -> Unit
 ) {
     // Minimal surfaces; only use elevation when necessary and keep it tiny
@@ -259,32 +307,49 @@ private fun CalendarDayCell(
 
     Box(
         modifier = Modifier
-            .aspectRatio(1f)
+            .size(cellSize)
             .clip(RoundedCornerShape(8.dp))
             .background(containerColor)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        // Day number (selected has white text)
-        Text(
-            text = day.toString(),
-            fontSize = 13.sp,
-            fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else NeumorphicColors.textPrimary
-        )
+        // Day number and lunar small label
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = day.toString(),
+                fontSize = 13.sp,
+                fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else NeumorphicColors.textPrimary
+            )
 
-        // Event indicators - small dots under the date number
-        if (priorities.isNotEmpty()) {
+            lunar?.let {
+                // show lunar day and month compactly, e.g. "17/11" or when leap month include L
+                val lm = if (it.isLeap) "L${it.month}" else it.month.toString()
+                Text(
+                    text = "${it.day}/${lm}",
+                    fontSize = 9.sp,
+                    color = NeumorphicColors.textSecondary
+                )
+            }
+        }
+
+        // Event and priority indicators - small dots under the date number
+        if (priorities.isNotEmpty() || events.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Show priority dots: RED for HIGH, BLUE for NORMAL. Show up to 2 dots.
-                if (Priority.HIGH in priorities) Dot(color = NeumorphicColors.accentPeach) // red/peach
+                // priority dots
+                if (Priority.HIGH in priorities) Dot(color = NeumorphicColors.accentPeach)
                 if (Priority.NORMAL in priorities) Dot(color = NeumorphicColors.accentBlue)
                 if (Priority.LOW in priorities && priorities.size == 1) Dot(color = NeumorphicColors.accentMint)
+
+                // event dots (distinct small marker)
+                events.take(2).forEach { ev ->
+                    Dot(color = if (ev.isLunar) NeumorphicColors.accentPeach else NeumorphicColors.accentBlue)
+                }
             }
         }
     }
