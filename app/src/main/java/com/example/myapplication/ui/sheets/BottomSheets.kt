@@ -1,8 +1,12 @@
 package com.example.myapplication.ui.sheets
 
+import android.Manifest
+import android.app.Activity
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,11 +28,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.AsyncImage
+
 import com.example.myapplication.model.Priority
 import com.example.myapplication.ui.components.NeumorphicButton
 import com.example.myapplication.ui.components.NeumorphicTextField
@@ -76,6 +83,32 @@ fun AddTaskSheet(
             imageFile
         )
     }
+
+    fun launchCameraCapture() {
+        val uri = createTempImageUri(context.applicationContext)
+        pendingCameraUri = uri
+        takePictureLauncher.launch(uri)
+    }
+
+    val requestCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            if (granted) {
+                launchCameraCapture()
+            } else {
+                val activity = context as? Activity
+                val shouldShowRationale = activity?.let {
+                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+                } ?: false
+                val message = if (shouldShowRationale) {
+                    "Cần quyền Camera để chụp ảnh. Vui lòng cấp quyền để tiếp tục."
+                } else {
+                    "Bạn đã từ chối quyền Camera. Hãy bật quyền trong Cài đặt nếu muốn chụp ảnh."
+                }
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    )
 
     Column(Modifier.padding(24.dp)) {
         Text("Thêm việc mới", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary)
@@ -161,9 +194,16 @@ fun AddTaskSheet(
                 modifier = Modifier
                     .weight(1f)
                     .clickable {
-                        val uri = createTempImageUri(context.applicationContext)
-                        pendingCameraUri = uri
-                        takePictureLauncher.launch(uri)
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.CAMERA
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (granted) {
+                            launchCameraCapture()
+                        } else {
+                            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                     },
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
