@@ -157,10 +157,16 @@ fun CalendarScreen(
                         // First show events section if present
                         if (dayEvents.isNotEmpty()) {
                             item {
-                                Text("Sự kiện", fontWeight = FontWeight.SemiBold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
+                                Text(
+                                    "Sự kiện",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = NeumorphicColors.textPrimary,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
                                 dayEvents.forEach { ev ->
                                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Dot(color = if (ev.isLunar) NeumorphicColors.accentPeach else NeumorphicColors.accentBlue)
+                                        // sự kiện: chấm nhỏ xanh biển
+                                        Dot(color = NeumorphicColors.accentBlue)
                                         Spacer(Modifier.width(8.dp))
                                         Column {
                                             Text(ev.title, color = NeumorphicColors.textPrimary)
@@ -169,6 +175,17 @@ fun CalendarScreen(
                                     }
                                 }
                                 Divider(color = NeumorphicColors.background.copy(alpha = 0.12f), thickness = 0.5.dp)
+                            }
+                        }
+
+                        if (dayTasks.isNotEmpty()) {
+                            item {
+                                Text(
+                                    "Công việc",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = NeumorphicColors.textPrimary,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
                             }
                         }
                         items(items = dayTasks, key = { it.id }) { task ->
@@ -345,7 +362,7 @@ private fun CalendarDayCell(
             }
         }
 
-        // Event and priority indicators - small dots under the date number
+                // Event and priority indicators - small dots under the date number
         if (priorities.isNotEmpty() || events.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -353,15 +370,21 @@ private fun CalendarDayCell(
                     .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // priority dots
-                if (Priority.HIGH in priorities) Dot(color = NeumorphicColors.accentPeach)
-                if (Priority.NORMAL in priorities) Dot(color = NeumorphicColors.accentBlue)
-                if (Priority.LOW in priorities && priorities.size == 1) Dot(color = NeumorphicColors.accentMint)
+                        // priority dots (công việc người dùng đặt)
+                        if (Priority.LOW in priorities) {
+                            Dot(color = NeumorphicColors.priorityLow)      // xanh lá
+                        }
+                        if (Priority.NORMAL in priorities) {
+                            Dot(color = NeumorphicColors.priorityNormal)  // vàng
+                        }
+                        if (Priority.HIGH in priorities) {
+                            Dot(color = NeumorphicColors.priorityHigh)    // đỏ
+                        }
 
-                // event dots (distinct small marker)
-                events.take(2).forEach { ev ->
-                    Dot(color = if (ev.isLunar) NeumorphicColors.accentPeach else NeumorphicColors.accentBlue)
-                }
+                        // event dot: một chấm xanh biển nếu có ít nhất một sự kiện
+                        if (events.isNotEmpty()) {
+                            Dot(color = NeumorphicColors.accentBlue)
+                        }
             }
         }
     }
