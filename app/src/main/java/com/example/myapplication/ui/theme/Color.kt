@@ -13,4 +13,9 @@ object NeumorphicColors {
     val accentPeach = Color(0xFFF5CDB6)
     val accentMint = Color(0xFFB8E6D5)
     val accentLavender = Color(0xFFD4C5F9)
+
+    // Priority colors for tasks
+    val priorityLow = Color(0xFF48BB78)      // xanh lá
+    val priorityNormal = Color(0xFFED8936)   // vàng / cam
+    val priorityHigh = Color(0xFFE53E3E)     // đỏ
 }

@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,15 +26,15 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 
 @Composable
 fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) -> Unit) {
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp)
-            .shadow(10.dp, RoundedCornerShape(30.dp), ambientColor = NeumorphicColors.darkShadow, spotColor = NeumorphicColors.lightShadow)
-            .background(NeumorphicColors.surface, RoundedCornerShape(30.dp))
-            .padding(12.dp)
+            .padding(24.dp),
+        shape = RoundedCornerShape(30.dp),
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             // SỬA LỖI: Gọi trực tiếp từng NavItem thay vì dùng vòng lặp Triple gây lỗi biên dịch
 
             NavItem(
@@ -64,27 +66,28 @@ fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationIt
 
 @Composable
 fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.size(48.dp)
-            .shadow(if (isSelected) 0.dp else 4.dp, RoundedCornerShape(16.dp))
-            .background(if (isSelected) NeumorphicColors.darkShadow.copy(0.1f) else NeumorphicColors.surface, RoundedCornerShape(16.dp))
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+    Card(
+        modifier = Modifier.size(48.dp).clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.darkShadow.copy(0.1f) else NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 4.dp)
     ) {
-        Icon(icon, null, tint = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary)
+        }
     }
 }
 
 @Composable
 fun NeumorphicFAB(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.size(64.dp)
-            .shadow(12.dp, CircleShape, ambientColor = NeumorphicColors.darkShadow, spotColor = NeumorphicColors.lightShadow)
-            .background(Brush.radialGradient(listOf(NeumorphicColors.surface, NeumorphicColors.background)), CircleShape)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+    Card(
+        modifier = modifier.size(64.dp).clickable { onClick() },
+        shape = CircleShape,
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
     ) {
-        // SỬA LỖI: Import Icons.Filled.Add rõ ràng ở trên đầu file
-        Icon(Icons.Filled.Add, "Add", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(28.dp))
+        Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(NeumorphicColors.surface, NeumorphicColors.background))), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Add, "Add", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(28.dp))
+        }
     }
 }

@@ -1,3 +1,23 @@
 <resources>
     <string name="app_name">My Application</string>
+    <string name="tasks_count">%1$d công việc</string>
+    <string name="prev_month">Tháng trước</string>
+    <string name="next_month">Tháng sau</string>
+    <string name="no_items_today">Không có việc trong ngày này</string>
+    <string name="all_day">Cả ngày</string>
+    <string name="priority_high">Cao</string>
+    <string name="priority_normal">Bình thường</string>
+    <string name="priority_low">Thấp</string>
+    <string name="collection_prefix">Danh mục %1$s</string>
+    <string name="cd_done">Hoàn thành</string>
+    <string name="cd_delete">Xoá</string>
+    <string-array name="weekday_short">
+        <item>T2</item>
+        <item>T3</item>
+        <item>T4</item>
+        <item>T5</item>
+        <item>T6</item>
+        <item>T7</item>
+        <item>CN</item>
+    </string-array>
 </resources>

@@ -19,9 +19,9 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun MyDayScreen(tasks: List<Task>, onTaskToggle: (Int) -> Unit, onTaskDelete: (Int) -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(modifier = Modifier.height(40.dp))
-        Text("Hôm nay", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 16.dp))
-        Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")), fontSize = 16.sp, color = NeumorphicColors.textSecondary, modifier = Modifier.padding(bottom = 24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Hôm nay", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
+        Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")), fontSize = 16.sp, color = NeumorphicColors.textSecondary, modifier = Modifier.padding(bottom = 12.dp))
 
         if (tasks.isEmpty()) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

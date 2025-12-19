@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -62,14 +64,15 @@ fun TaskCard(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
 
 @Composable
 fun NeumorphicCheckbox(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Box(
-        modifier = Modifier.size(28.dp)
-            .shadow(if (checked) 0.dp else 6.dp, RoundedCornerShape(8.dp), ambientColor = NeumorphicColors.darkShadow, spotColor = NeumorphicColors.lightShadow)
-            .background(if (checked) NeumorphicColors.accentBlue else NeumorphicColors.surface, RoundedCornerShape(8.dp))
-            .clickable { onCheckedChange(!checked) },
-        contentAlignment = Alignment.Center
+    Card(
+        modifier = Modifier.size(28.dp).clickable { onCheckedChange(!checked) },
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = if (checked) NeumorphicColors.accentBlue else NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (checked) 0.dp else 6.dp)
     ) {
-        if (checked) Icon(Icons.Default.Check, "Checked", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(18.dp))
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (checked) Icon(Icons.Default.Check, "Checked", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(18.dp))
+        }
     }
 }
 

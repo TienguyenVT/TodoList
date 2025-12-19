@@ -22,8 +22,8 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 @Composable
 fun SettingsScreen() {
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Spacer(Modifier.height(40.dp))
-        Text("Cài đặt", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 16.dp))
+        Spacer(Modifier.height(8.dp))
+        Text("Cài đặt", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = NeumorphicColors.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { SettingsSection("Giao diện") { SettingsItem(Icons.Default.Face, "Chủ đề", "Soft UI (Neumorphic)") } }
             item { SettingsSection("Thông tin") { SettingsItem(Icons.Default.Info, "Phiên bản", "1.0.0") } }
