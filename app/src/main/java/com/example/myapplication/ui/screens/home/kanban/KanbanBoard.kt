@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -159,6 +160,87 @@ fun KanbanBoard(
 }
 
 @Composable
+fun DraggedTaskOverlay(
+    kanbanTask: KanbanTask,
+    collections: Map<Int, String>,
+    pointerInWindow: Offset,
+    anchorInItem: Offset,
+    boardTopLeftInWindow: Offset,
+    modifier: Modifier = Modifier
+) {
+    val task = kanbanTask.task
+    val offsetX = (pointerInWindow.x - boardTopLeftInWindow.x - anchorInItem.x).roundToInt()
+    val offsetY = (pointerInWindow.y - boardTopLeftInWindow.y - anchorInItem.y).roundToInt()
+
+    val priorityColor = when (task.priority) {
+        Priority.HIGH -> NeumorphicColors.priorityHigh
+        Priority.NORMAL -> NeumorphicColors.priorityNormal
+        Priority.LOW -> NeumorphicColors.priorityLow
+    }
+
+    Card(
+        modifier = modifier
+            .offset { androidx.compose.ui.unit.IntOffset(offsetX, offsetY) }
+            .widthIn(max = 360.dp)
+            .shadow(12.dp, MaterialTheme.shapes.medium)
+            .zIndex(10f),
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+        ) {
+            // Top priority color line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(priorityColor)
+            )
+
+            Column(
+                modifier = Modifier
+                    .padding(12.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    text = task.title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = NeumorphicColors.textPrimary,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        task.collectionId?.let { cid ->
+                            val name = collections[cid] ?: cid.toString()
+                            Text(
+                                text = stringResource(R.string.collection_prefix, name),
+                                fontSize = 12.sp,
+                                color = NeumorphicColors.textSecondary
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = stringResource(R.string.cd_drag),
+                        tint = NeumorphicColors.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun KanbanColumnCard(
     column: KanbanColumn,
     tasks: List<KanbanTask>,
@@ -264,6 +346,12 @@ private fun DraggableKanbanTask(
         label = "kanban_drag_alpha"
     )
 
+    val priorityColor = when (task.priority) {
+        Priority.HIGH -> NeumorphicColors.priorityHigh
+        Priority.NORMAL -> NeumorphicColors.priorityNormal
+        Priority.LOW -> NeumorphicColors.priorityLow
+    }
+
     Card(
         modifier = Modifier
             .alpha(cardAlpha)
@@ -280,185 +368,118 @@ private fun DraggableKanbanTask(
     ) {
         Column(
             modifier = Modifier
-                .padding(8.dp)
                 .fillMaxWidth()
         ) {
-            // Task title
-            Text(
-                text = task.title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = NeumorphicColors.textPrimary,
-                modifier = Modifier.padding(bottom = 4.dp)
+            // Top priority color line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(priorityColor)
             )
 
-            // Task metadata and actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth()
             ) {
-                Column {
-                    val priorityLabel = when (task.priority) {
-                        Priority.HIGH -> stringResource(R.string.priority_high)
-                        Priority.NORMAL -> stringResource(R.string.priority_normal)
-                        Priority.LOW -> stringResource(R.string.priority_low)
-                    }
-                    Text(
-                        text = priorityLabel,
-                        fontSize = 12.sp,
-                        color = NeumorphicColors.textSecondary
-                    )
+                // Task title
+                Text(
+                    text = task.title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = NeumorphicColors.textPrimary,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
 
-                    task.collectionId?.let { cid ->
-                        val name = collections[cid] ?: cid.toString()
-                        Text(
-                            text = stringResource(R.string.collection_prefix, name),
-                            fontSize = 12.sp,
-                            color = NeumorphicColors.textSecondary
-                        )
-                    }
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onToggle,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = stringResource(R.string.cd_done),
-                            tint = if (task.isCompleted) NeumorphicColors.accentMint else NeumorphicColors.textSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
+                // Task metadata and actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        task.collectionId?.let { cid ->
+                            val name = collections[cid] ?: cid.toString()
+                            Text(
+                                text = stringResource(R.string.collection_prefix, name),
+                                fontSize = 12.sp,
+                                color = NeumorphicColors.textSecondary
+                            )
+                        }
                     }
 
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.cd_delete),
-                            tint = NeumorphicColors.textSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onToggle,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = stringResource(R.string.cd_done),
+                                tint = if (task.isCompleted) NeumorphicColors.accentMint else NeumorphicColors.textSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
 
-                    // Drag handle: long-press then drag
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .onGloballyPositioned { handleRectInWindow = it.boundsInWindow() }
-                            .pointerInput(Unit) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { offset ->
-                                        val card = cardRectInWindow
-                                        val handle = handleRectInWindow
-                                        if (card != null && handle != null) {
-                                            val pointerInWindow = handle.topLeft + offset
-                                            val anchorInItem = pointerInWindow - card.topLeft
-                                            onDragStart(pointerInWindow, anchorInItem)
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.cd_delete),
+                                tint = NeumorphicColors.textSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Drag handle: long-press then drag
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .onGloballyPositioned { handleRectInWindow = it.boundsInWindow() }
+                                .pointerInput(Unit) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = { offset ->
+                                            val card = cardRectInWindow
+                                            val handle = handleRectInWindow
+                                            if (card != null && handle != null) {
+                                                val pointerInWindow = handle.topLeft + offset
+                                                val anchorInItem = pointerInWindow - card.topLeft
+                                                onDragStart(pointerInWindow, anchorInItem)
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            onDragEnd()
+                                        },
+                                        onDragCancel = {
+                                            // Cleanup drag state when gesture is cancelled
+                                            onDragEnd()
                                         }
-                                    },
-                                    onDragEnd = {
-                                        onDragEnd()
-                                    },
-                                    onDragCancel = {
-                                        // Cleanup drag state when gesture is cancelled
-                                        onDragEnd()
+                                    ) { change, _ ->
+                                        val handle = handleRectInWindow
+                                        if (handle != null) {
+                                            onDrag(handle.topLeft + change.position)
+                                        }
                                     }
-                                ) { change, _ ->
-                                    val handle = handleRectInWindow
-                                    if (handle != null) {
-                                        onDrag(handle.topLeft + change.position)
-                                    }
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DragHandle,
-                            contentDescription = stringResource(R.string.cd_drag),
-                            tint = NeumorphicColors.textSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = stringResource(R.string.cd_drag),
+                                tint = NeumorphicColors.textSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
         }
-    }
 
-    if (isBeingDragged) {
-        Spacer(modifier = Modifier.height(0.dp))
-    }
-}
-
-@Composable
-private fun DraggedTaskOverlay(
-    kanbanTask: KanbanTask,
-    collections: Map<Int, String>,
-    pointerInWindow: Offset,
-    anchorInItem: Offset,
-    boardTopLeftInWindow: Offset,
-    modifier: Modifier = Modifier
-) {
-    val task = kanbanTask.task
-    val offsetX = (pointerInWindow.x - boardTopLeftInWindow.x - anchorInItem.x).roundToInt()
-    val offsetY = (pointerInWindow.y - boardTopLeftInWindow.y - anchorInItem.y).roundToInt()
-
-    Card(
-        modifier = modifier
-            .offset { androidx.compose.ui.unit.IntOffset(offsetX, offsetY) }
-            .widthIn(max = 360.dp)
-            .shadow(12.dp, MaterialTheme.shapes.medium)
-            .zIndex(10f),
-        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = task.title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = NeumorphicColors.textPrimary,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    val priorityLabel = when (task.priority) {
-                        Priority.HIGH -> stringResource(R.string.priority_high)
-                        Priority.NORMAL -> stringResource(R.string.priority_normal)
-                        Priority.LOW -> stringResource(R.string.priority_low)
-                    }
-                    Text(
-                        text = priorityLabel,
-                        fontSize = 12.sp,
-                        color = NeumorphicColors.textSecondary
-                    )
-
-                    task.collectionId?.let { cid ->
-                        val name = collections[cid] ?: cid.toString()
-                        Text(
-                            text = stringResource(R.string.collection_prefix, name),
-                            fontSize = 12.sp,
-                            color = NeumorphicColors.textSecondary
-                        )
-                    }
-                }
-
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = stringResource(R.string.cd_drag),
-                    tint = NeumorphicColors.textSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+        if (isBeingDragged) {
+            Spacer(modifier = Modifier.height(0.dp))
         }
     }
 }

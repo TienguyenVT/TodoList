@@ -2,6 +2,11 @@ package com.example.myapplication
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -41,7 +46,7 @@ import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ZenTaskApp() {
+fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
     var currentScreen by remember { mutableStateOf(NavigationItem.MY_DAY) }
     var showAddTaskSheet by remember { mutableStateOf(false) }
     var showAddCollectionSheet by remember { mutableStateOf(false) }
@@ -72,6 +77,14 @@ fun ZenTaskApp() {
     // Stable current date that updates at midnight so 'todayTasks' refreshes automatically
     val currentDate = remember { mutableStateOf(LocalDate.now()) }
 
+    // Controls when bottom navigation and FAB appear with entrance animation
+    var chromeVisible by remember { mutableStateOf(false) }
+
+    // Notify activity that initial composition is ready (for splash screen coordination)
+    LaunchedEffect(Unit) {
+        onAppReady?.invoke()
+    }
+
     LaunchedEffect(currentScreen) {
         if (currentScreen != NavigationItem.COLLECTIONS) {
             showAddTaskSheet = false
@@ -86,6 +99,12 @@ fun ZenTaskApp() {
             delay(waitMillis)
             currentDate.value = LocalDate.now()
         }
+    }
+
+    // Delay chrome (bottom nav & FAB) entrance slightly after content
+    LaunchedEffect(Unit) {
+        delay(500)
+        chromeVisible = true
     }
 
     // Memoize filtered lists; derivedStateOf will track snapshot reads (no extra keys required)
@@ -213,14 +232,37 @@ fun ZenTaskApp() {
                     NavigationItem.SETTINGS -> SettingsScreen()
                 }
             }
-            NeumorphicBottomNav(currentScreen) { currentScreen = it }
+
+            AnimatedVisibility(
+                visible = chromeVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight },
+                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                ) + fadeIn(
+                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                )
+            ) {
+                NeumorphicBottomNav(currentScreen) { currentScreen = it }
+            }
         }
 
         if (currentScreen == NavigationItem.COLLECTIONS) {
-            NeumorphicFAB(
-                onClick = { showAddTaskSheet = true },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 90.dp)
-            )
+            AnimatedVisibility(
+                visible = chromeVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight / 2 },
+                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                ) + fadeIn(
+                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                )
+            ) {
+                NeumorphicFAB(
+                    onClick = { showAddTaskSheet = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 24.dp, bottom = 90.dp)
+                )
+            }
         }
 
         // Các Bottom Sheet
