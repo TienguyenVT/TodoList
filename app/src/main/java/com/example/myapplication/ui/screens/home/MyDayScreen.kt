@@ -18,6 +18,7 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun MyDayScreen(tasks: List<Task>, onTaskToggle: (Int) -> Unit, onTaskDelete: (Int) -> Unit) {
@@ -35,7 +36,9 @@ fun MyDayScreen(tasks: List<Task>, onTaskToggle: (Int) -> Unit, onTaskDelete: (I
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 Text(
-                    LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")),
+                    LocalDate.now().format(
+                        DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("vi"))
+                    ),
                     fontSize = 16.sp,
                     color = NeumorphicColors.textSecondary,
                     modifier = Modifier.padding(bottom = 12.dp)
