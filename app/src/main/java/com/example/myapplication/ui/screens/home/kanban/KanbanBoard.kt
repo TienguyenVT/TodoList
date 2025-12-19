@@ -28,9 +28,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -65,12 +67,13 @@ fun KanbanBoard(
     onTaskDelete: (Int) -> Unit,
     onTaskStatusChange: (Int, KanbanColumn) -> Unit
 ) {
-    // Group tasks by Kanban columns
+    // Group tasks by Kanban columns using raw status from DB
+    // 0 = UNCOMPLETED, 1 = COMPLETED, 2 = IN_PROGRESS
     val tasksByColumn = remember(tasks) {
         tasks.groupBy { task ->
-            when {
-                task.isCompleted -> KanbanColumn.COMPLETED
-                task.priority == Priority.HIGH -> KanbanColumn.IN_PROGRESS
+            when (task.status) {
+                1 -> KanbanColumn.COMPLETED
+                2 -> KanbanColumn.IN_PROGRESS
                 else -> KanbanColumn.UNCOMPLETED
             }
         }.mapValues { entry ->
@@ -85,13 +88,19 @@ fun KanbanBoard(
     // Track bounds of each column (row now) in window coordinates
     val columnBounds = remember { mutableStateMapOf<KanbanColumn, Rect>() }
     var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    var boardWidthPx by remember { mutableStateOf(0f) }
     val haptics = LocalHapticFeedback.current
+
+    val density = LocalDensity.current
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(NeumorphicColors.background)
-            .onGloballyPositioned { boardBounds = it.boundsInWindow() }
+            .onGloballyPositioned {
+                boardBounds = it.boundsInWindow()
+                boardWidthPx = it.size.width.toFloat()
+            }
     ) {
         Column(
             modifier = Modifier
@@ -147,12 +156,17 @@ fun KanbanBoard(
         val overlay = dragInfo
         if (overlay != null) {
             val boardTopLeft = boardBounds?.topLeft ?: Offset.Zero
+            val cardWidthDp = with(density) {
+                // Approximate one grid column width
+                (boardWidthPx / 3f).toDp()
+            }
             DraggedTaskOverlay(
                 kanbanTask = overlay.item,
                 collections = collections,
                 pointerInWindow = overlay.pointerInWindow,
                 anchorInItem = overlay.anchorInItem,
                 boardTopLeftInWindow = boardTopLeft,
+                cardWidth = cardWidthDp,
                 modifier = Modifier.zIndex(10f)
             )
         }
@@ -166,6 +180,7 @@ fun DraggedTaskOverlay(
     pointerInWindow: Offset,
     anchorInItem: Offset,
     boardTopLeftInWindow: Offset,
+    cardWidth: Dp,
     modifier: Modifier = Modifier
 ) {
     val task = kanbanTask.task
@@ -181,7 +196,7 @@ fun DraggedTaskOverlay(
     Card(
         modifier = modifier
             .offset { androidx.compose.ui.unit.IntOffset(offsetX, offsetY) }
-            .widthIn(max = 360.dp)
+            .width(cardWidth)
             .shadow(12.dp, MaterialTheme.shapes.medium)
             .zIndex(10f),
         colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),

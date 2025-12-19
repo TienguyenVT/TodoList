@@ -165,21 +165,16 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                                 try {
                                     val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
                                     if (current != null) {
-                                        val (newStatus, newPriority) = when (column) {
-                                            KanbanColumn.COMPLETED -> 1 to current.priority
-                                            KanbanColumn.IN_PROGRESS -> 0 to 2 // HIGH
-                                            KanbanColumn.UNCOMPLETED -> {
-                                                val adjustedPriority = if (current.priority == 2) 1 else current.priority
-                                                0 to adjustedPriority
-                                            }
+                                        val newStatus = when (column) {
+                                            KanbanColumn.COMPLETED -> 1 // completed
+                                            KanbanColumn.IN_PROGRESS -> 2 // in-progress
+                                            KanbanColumn.UNCOMPLETED -> 0 // uncompleted
                                         }
 
                                         withContext(Dispatchers.IO) {
+                                            // Only change status; keep priority as user set
                                             taskDao.update(
-                                                current.copy(
-                                                    status = newStatus,
-                                                    priority = newPriority
-                                                )
+                                                current.copy(status = newStatus)
                                             )
                                         }
                                     }
@@ -383,6 +378,7 @@ private fun DbTask.toUiTask(): Task {
         title = title,
         dueDate = dueDate?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
         priority = priority.toUiPriority(),
+        status = status,
         isCompleted = status == 1,
         collectionId = groupId,
         description = description,
