@@ -29,6 +29,8 @@ import com.example.myapplication.model.Task
 import com.example.myapplication.ui.components.NeumorphicBottomNav
 import com.example.myapplication.ui.components.NeumorphicFAB
 import com.example.myapplication.ui.screens.*
+import com.example.myapplication.ui.screens.kanban.KanbanHomeScreen
+import com.example.myapplication.ui.screens.kanban.KanbanColumn
 import com.example.myapplication.ui.screens.calendar.CalendarScreen
 import com.example.myapplication.ui.sheets.AddCollectionSheet
 import com.example.myapplication.ui.sheets.AddTaskSheet
@@ -57,6 +59,11 @@ fun ZenTaskApp() {
     val dbCollections by taskGroupDao.observeAll().collectAsState(initial = emptyList())
     val collections by remember(dbCollections) {
         derivedStateOf { dbCollections.map { it.toUiCollection() } }
+    }
+
+    // Collection name map for UI components
+    val collectionNameMap by remember(collections) {
+        derivedStateOf { collections.associate { it.id to it.name } }
     }
 
     // Chọn collection hiện tại
@@ -102,9 +109,10 @@ fun ZenTaskApp() {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 when (currentScreen) {
-                    NavigationItem.MY_DAY -> MyDayScreen(
-                        todayTasks,
-                        { id ->
+                    NavigationItem.MY_DAY -> KanbanHomeScreen(
+                        tasks = tasks,
+                        collections = collectionNameMap,
+                        onTaskToggle = { id ->
                             coroutineScope.launch {
                                 try {
                                     val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
@@ -123,7 +131,7 @@ fun ZenTaskApp() {
                                 }
                             }
                         },
-                        { id ->
+                        onTaskDelete = { id ->
                             coroutineScope.launch {
                                 try {
                                     withContext(Dispatchers.IO) { taskDao.deleteById(id) }
@@ -132,7 +140,22 @@ fun ZenTaskApp() {
                                     showToast("Lỗi khi xoá công việc")
                                 }
                             }
-                        }
+                        },
+                        onTaskStatusChange = { id, column ->
+                            coroutineScope.launch {
+                                try {
+                                    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                                    if (current != null) {
+                                        val newStatus = if (column == KanbanColumn.COMPLETED) 1 else 0
+                                        withContext(Dispatchers.IO) { taskDao.update(current.copy(status = newStatus)) }
+                                    }
+                                } catch (t: Throwable) {
+                                    Log.e(tag, "Change status failed: taskId=$id", t)
+                                    showToast("Lỗi khi cập nhật trạng thái")
+                                }
+                            }
+                        },
+                        onAddTask = { showAddTaskSheet = true }
                     )
                     NavigationItem.CALENDAR -> CalendarScreen(
                         tasks = tasks,
