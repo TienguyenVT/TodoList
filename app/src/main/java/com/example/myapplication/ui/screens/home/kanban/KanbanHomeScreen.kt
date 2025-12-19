@@ -41,19 +41,6 @@ fun KanbanHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "Bảng Kanban",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NeumorphicColors.textPrimary
-                            )
-                            Text(
-                                text = "Kéo thả công việc giữa các cột",
-                                fontSize = 14.sp,
-                                color = NeumorphicColors.textSecondary
-                            )
-                        }
                         Text(
                             text = "$completedCount/$totalCount hoàn thành",
                             fontSize = 14.sp,
@@ -66,20 +53,6 @@ fun KanbanHomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Bảng Kanban",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NeumorphicColors.textPrimary
-                            )
-                            Text(
-                                text = "Kéo thả công việc giữa các cột",
-                                fontSize = 14.sp,
-                                color = NeumorphicColors.textSecondary
-                            )
-                        }
-
                         Text(
                             text = "$completedCount/$totalCount hoàn thành",
                             fontSize = 14.sp,

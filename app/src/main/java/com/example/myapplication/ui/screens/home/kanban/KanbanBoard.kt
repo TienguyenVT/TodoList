@@ -8,9 +8,9 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -195,15 +195,12 @@ private fun KanbanColumnCard(
             // Column header
             Row(
                 modifier = Modifier
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(bottom = 12.dp)
-                ) {
+              
                     Text(
                         text = column.title,
                         fontSize = 16.sp,
@@ -215,44 +212,19 @@ private fun KanbanColumnCard(
                         fontSize = 12.sp,
                         color = NeumorphicColors.textSecondary
                     )
-                }
+                
             }
 
-            // Task list
-            val listState = rememberLazyListState()
-
-            LazyColumn(
+            // Task list - 3 column grid
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 8.dp)
             ) {
-                if (isDragOver && draggedItem != null && draggedItem.column != column) {
-                    item(key = "drop_hint_${column.name}") {
-                        Surface(
-                            color = NeumorphicColors.accentMint.copy(alpha = 0.10f),
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(
-                                    width = 1.dp,
-                                    color = NeumorphicColors.accentMint.copy(alpha = 0.45f),
-                                    shape = MaterialTheme.shapes.medium
-                                )
-                                .padding(12.dp)
-                        ) {
-                            Text(
-                                text = "Thả để chuyển vào \"${column.title}\"",
-                                fontSize = 12.sp,
-                                color = NeumorphicColors.textSecondary,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
-                }
-
                 items(tasks, key = { it.task.id }) { kanbanTask ->
                     DraggableKanbanTask(
                         kanbanTask = kanbanTask,
@@ -294,7 +266,6 @@ private fun DraggableKanbanTask(
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
             .alpha(cardAlpha)
             .onGloballyPositioned { cardRectInWindow = it.boundsInWindow() },
         colors = CardDefaults.cardColors(
@@ -309,9 +280,8 @@ private fun DraggableKanbanTask(
     ) {
         Column(
             modifier = Modifier
-                .padding(12.dp)
+                .padding(8.dp)
                 .fillMaxWidth()
-                .then(Modifier)
         ) {
             // Task title
             Text(

@@ -146,8 +146,23 @@ fun ZenTaskApp() {
                                 try {
                                     val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
                                     if (current != null) {
-                                        val newStatus = if (column == KanbanColumn.COMPLETED) 1 else 0
-                                        withContext(Dispatchers.IO) { taskDao.update(current.copy(status = newStatus)) }
+                                        val (newStatus, newPriority) = when (column) {
+                                            KanbanColumn.COMPLETED -> 1 to current.priority
+                                            KanbanColumn.IN_PROGRESS -> 0 to 2 // HIGH
+                                            KanbanColumn.UNCOMPLETED -> {
+                                                val adjustedPriority = if (current.priority == 2) 1 else current.priority
+                                                0 to adjustedPriority
+                                            }
+                                        }
+
+                                        withContext(Dispatchers.IO) {
+                                            taskDao.update(
+                                                current.copy(
+                                                    status = newStatus,
+                                                    priority = newPriority
+                                                )
+                                            )
+                                        }
                                     }
                                 } catch (t: Throwable) {
                                     Log.e(tag, "Change status failed: taskId=$id", t)
