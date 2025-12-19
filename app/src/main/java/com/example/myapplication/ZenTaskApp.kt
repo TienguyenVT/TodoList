@@ -29,8 +29,8 @@ import com.example.myapplication.model.Task
 import com.example.myapplication.ui.components.NeumorphicBottomNav
 import com.example.myapplication.ui.components.NeumorphicFAB
 import com.example.myapplication.ui.screens.*
-import com.example.myapplication.ui.screens.kanban.KanbanHomeScreen
-import com.example.myapplication.ui.screens.kanban.KanbanColumn
+import com.example.myapplication.ui.screens.home.kanban.KanbanHomeScreen
+import com.example.myapplication.ui.screens.home.kanban.KanbanColumn
 import com.example.myapplication.ui.screens.calendar.CalendarScreen
 import com.example.myapplication.ui.sheets.AddCollectionSheet
 import com.example.myapplication.ui.sheets.AddTaskSheet

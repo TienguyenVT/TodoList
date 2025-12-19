@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.screens.kanban
+package com.example.myapplication.ui.screens.home.kanban
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints

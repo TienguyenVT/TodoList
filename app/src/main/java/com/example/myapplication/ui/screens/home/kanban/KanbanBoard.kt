@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.screens.kanban
+package com.example.myapplication.ui.screens.home.kanban
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -393,6 +393,10 @@ private fun DraggableKanbanTask(
                                     },
                                     onDragEnd = {
                                         onDragEnd()
+                                    },
+                                    onDragCancel = {
+                                        // Cleanup drag state when gesture is cancelled
+                                        onDragEnd()
                                     }
                                 ) { change, _ ->
                                     val handle = handleRectInWindow
@@ -405,7 +409,7 @@ private fun DraggableKanbanTask(
                     ) {
                         Icon(
                             imageVector = Icons.Default.DragHandle,
-                            contentDescription = "Drag",
+                            contentDescription = stringResource(R.string.cd_drag),
                             tint = NeumorphicColors.textSecondary,
                             modifier = Modifier.size(20.dp)
                         )
@@ -480,7 +484,7 @@ private fun DraggedTaskOverlay(
 
                 Icon(
                     imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Drag",
+                    contentDescription = stringResource(R.string.cd_drag),
                     tint = NeumorphicColors.textSecondary,
                     modifier = Modifier.size(20.dp)
                 )

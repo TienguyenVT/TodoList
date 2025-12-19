@@ -11,6 +11,7 @@
     <string name="collection_prefix">Danh mục %1$s</string>
     <string name="cd_done">Hoàn thành</string>
     <string name="cd_delete">Xoá</string>
+    <string name="cd_drag">Kéo</string>
     <string-array name="weekday_short">
         <item>T2</item>
         <item>T3</item>
