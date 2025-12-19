@@ -3,17 +3,14 @@ package com.example.myapplication.ui.screens.kanban
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.myapplication.R
+ 
 import com.example.myapplication.model.Task
 import com.example.myapplication.ui.theme.NeumorphicColors
 
@@ -23,8 +20,7 @@ fun KanbanHomeScreen(
     collections: Map<Int, String>,
     onTaskToggle: (Int) -> Unit,
     onTaskDelete: (Int) -> Unit,
-    onTaskStatusChange: (Int, KanbanColumn) -> Unit,
-    onAddTask: () -> Unit
+    onTaskStatusChange: (Int, KanbanColumn) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(
@@ -103,19 +99,6 @@ fun KanbanHomeScreen(
             )
         }
 
-        // Floating Action Button
-        FloatingActionButton(
-            onClick = onAddTask,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = NeumorphicColors.accentMint
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = stringResource(R.string.cd_done),
-                tint = NeumorphicColors.textPrimary
-            )
-        }
+        // FAB removed from Home tab per request
     }
 }

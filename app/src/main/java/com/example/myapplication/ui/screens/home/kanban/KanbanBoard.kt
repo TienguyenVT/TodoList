@@ -5,17 +5,18 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -26,7 +27,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -37,10 +37,6 @@ import com.example.myapplication.R
 import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
 import com.example.myapplication.ui.theme.NeumorphicColors
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 enum class KanbanColumn(val title: String) {
@@ -88,11 +84,7 @@ fun KanbanBoard(
     // Track bounds of each column (row now) in window coordinates
     val columnBounds = remember { mutableStateMapOf<KanbanColumn, Rect>() }
     var boardBounds by remember { mutableStateOf<Rect?>(null) }
-    val scrollState = rememberScrollState()
-    val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
-    val scope = rememberCoroutineScope()
-    var autoScrollJob by remember { mutableStateOf<Job?>(null) }
 
     Box(
         modifier = Modifier
@@ -103,8 +95,7 @@ fun KanbanBoard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(12.dp),
+                .padding(4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // stacked rows: one card per KanbanColumn
@@ -132,34 +123,8 @@ fun KanbanBoard(
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                             }
                         }
-
-                        val boardRect = boardBounds
-                        if (boardRect != null) {
-                            val thresholdPx = with(density) { 64.dp.toPx() }
-                            val stepPx = with(density) { 18.dp.toPx() }
-                            val direction = when {
-                                pointerInWindow.y < boardRect.top + thresholdPx -> -1
-                                pointerInWindow.y > boardRect.bottom - thresholdPx -> 1
-                                else -> 0
-                            }
-
-                            if (direction == 0) {
-                                autoScrollJob?.cancel()
-                                autoScrollJob = null
-                            } else if (autoScrollJob?.isActive != true) {
-                                autoScrollJob = scope.launch {
-                                    while (isActive && dragInfo != null) {
-                                        scrollState.scrollBy(direction * stepPx)
-                                        delay(16)
-                                    }
-                                }
-                            }
-                        }
                     },
                     onDragEnd = {
-                        autoScrollJob?.cancel()
-                        autoScrollJob = null
-
                         val target = dragOverColumn
                         val item = dragInfo?.item
                         if (target != null && item != null && target != item.column) {
@@ -170,10 +135,12 @@ fun KanbanBoard(
                     },
                     onTaskToggle = onTaskToggle,
                     onTaskDelete = onTaskDelete,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .heightIn(min = 250.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(72.dp))
         }
 
         val overlay = dragInfo
@@ -206,8 +173,6 @@ private fun KanbanColumnCard(
     onTaskDelete: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by rememberSaveable(column.name) { mutableStateOf(column != KanbanColumn.COMPLETED) }
-
     val targetColor by animateColorAsState(
         targetValue = if (isDragOver) NeumorphicColors.accentMint.copy(alpha = 0.12f) else NeumorphicColors.surface,
         label = "kanban_drop_target"
@@ -251,19 +216,21 @@ private fun KanbanColumnCard(
                         color = NeumorphicColors.textSecondary
                     )
                 }
-                TextButton(onClick = { expanded = !expanded }) {
-                    Text(
-                        text = if (expanded) "Thu gọn" else "Mở rộng",
-                        fontSize = 12.sp,
-                        color = NeumorphicColors.textSecondary
-                    )
-                }
             }
 
             // Task list
-            if (expanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isDragOver && draggedItem != null && draggedItem.column != column) {
+            val listState = rememberLazyListState()
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 8.dp)
+            ) {
+                if (isDragOver && draggedItem != null && draggedItem.column != column) {
+                    item(key = "drop_hint_${column.name}") {
                         Surface(
                             color = NeumorphicColors.accentMint.copy(alpha = 0.10f),
                             shape = MaterialTheme.shapes.medium,
@@ -284,21 +251,21 @@ private fun KanbanColumnCard(
                             )
                         }
                     }
+                }
 
-                    tasks.forEach { kanbanTask ->
-                        DraggableKanbanTask(
-                            kanbanTask = kanbanTask,
-                            collections = collections,
-                            isBeingDragged = draggedItem == kanbanTask,
-                            onDragStart = { pointerInWindow: Offset, anchorInItem: Offset ->
-                                onDragStart(kanbanTask, pointerInWindow, anchorInItem)
-                            },
-                            onDrag = onDrag,
-                            onDragEnd = onDragEnd,
-                            onToggle = { onTaskToggle(kanbanTask.task.id) },
-                            onDelete = { onTaskDelete(kanbanTask.task.id) }
-                        )
-                    }
+                items(tasks, key = { it.task.id }) { kanbanTask ->
+                    DraggableKanbanTask(
+                        kanbanTask = kanbanTask,
+                        collections = collections,
+                        isBeingDragged = draggedItem == kanbanTask,
+                        onDragStart = { pointerInWindow: Offset, anchorInItem: Offset ->
+                            onDragStart(kanbanTask, pointerInWindow, anchorInItem)
+                        },
+                        onDrag = onDrag,
+                        onDragEnd = onDragEnd,
+                        onToggle = { onTaskToggle(kanbanTask.task.id) },
+                        onDelete = { onTaskDelete(kanbanTask.task.id) }
+                    )
                 }
             }
         }

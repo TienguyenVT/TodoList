@@ -154,8 +154,7 @@ fun ZenTaskApp() {
                                     showToast("Lỗi khi cập nhật trạng thái")
                                 }
                             }
-                        },
-                        onAddTask = { showAddTaskSheet = true }
+                        }
                     )
                     NavigationItem.CALENDAR -> CalendarScreen(
                         tasks = tasks,
