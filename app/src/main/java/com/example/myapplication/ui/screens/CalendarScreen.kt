@@ -276,7 +276,7 @@ private fun CompactMonthGrid(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            listOf("CN", "T2", "T3", "T4", "T5", "T6", "T7").forEach { dow ->
+            listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN").forEach { dow ->
                 Text(
                     text = dow,
                     fontSize = 12.sp,
@@ -357,7 +357,11 @@ private fun CalendarDayCell(
         contentAlignment = Alignment.Center
     ) {
         // Day number and lunar small label
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
                 text = day.toString(),
                 fontSize = 13.sp,
@@ -381,7 +385,7 @@ private fun CalendarDayCell(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 6.dp),
+                    .padding(bottom = 15.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // priority dots (công việc người dùng đặt)
