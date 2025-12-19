@@ -227,7 +227,7 @@ private fun CompactMonthGrid(
 ) {
     val firstOfMonth = yearMonth.atDay(1)
     val daysInMonth = yearMonth.lengthOfMonth()
-    val startOffset = (firstOfMonth.dayOfWeek.value % 7) // Sunday=0
+    val startOffset = (firstOfMonth.dayOfWeek.value + 6) % 7 // Monday=0 .. Sunday=6
     val dayList = (1..daysInMonth).toList()
 
     // Precompute indicators map: date -> set of priorities present and events present
