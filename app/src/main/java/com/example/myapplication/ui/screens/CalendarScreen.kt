@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.runtime.*
@@ -25,9 +26,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.R
+import com.example.myapplication.model.Collection
 import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
 import com.example.myapplication.model.FestivalUtils
@@ -37,10 +42,12 @@ import android.util.Log
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import com.example.myapplication.BuildConfig
 
 @Composable
 fun CalendarScreen(
     tasks: List<Task>,
+    collections: List<Collection>,
     onTaskToggle: (Int) -> Unit,
     onTaskDelete: (Int) -> Unit
 ) {
@@ -52,6 +59,7 @@ fun CalendarScreen(
 
     // group tasks by date (derived for performance) - ignore tasks without a dueDate so keys are non-null
     val tasksByDate by remember(tasks) { derivedStateOf { tasks.filter { it.dueDate != null }.groupBy { it.dueDate!! } } }
+    val collectionNameMap by remember(collections) { derivedStateOf { collections.associate { it.id to it.name } } }
 
     Column(modifier = Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         // Header: day string and month selector (high info density)
@@ -70,8 +78,9 @@ fun CalendarScreen(
                     fontWeight = FontWeight.SemiBold,
                     color = NeumorphicColors.textPrimary
                 )
+                val taskCount = (tasksByDate[selectedDate ?: LocalDate.now()] ?: emptyList()).size
                 Text(
-                    text = "${(tasksByDate[selectedDate ?: LocalDate.now()] ?: emptyList()).size} công việc",
+                    text = stringResource(R.string.tasks_count, taskCount),
                     fontSize = 12.sp,
                     color = NeumorphicColors.textSecondary
                 )
@@ -79,7 +88,11 @@ fun CalendarScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) {
-                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Prev", tint = NeumorphicColors.textPrimary)
+                    Icon(
+                        Icons.Default.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.prev_month),
+                        tint = NeumorphicColors.textPrimary
+                    )
                 }
                 Text(
                     text = selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
@@ -87,7 +100,11 @@ fun CalendarScreen(
                     color = NeumorphicColors.textPrimary
                 )
                 IconButton(onClick = { selectedMonth = selectedMonth.plusMonths(1) }) {
-                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next", tint = NeumorphicColors.textPrimary)
+                    Icon(
+                        Icons.Default.KeyboardArrowRight,
+                        contentDescription = stringResource(R.string.next_month),
+                        tint = NeumorphicColors.textPrimary
+                    )
                 }
             }
         }
@@ -106,7 +123,7 @@ fun CalendarScreen(
         // Draggable/lightweight sheet area for tasks
         val collapsedHeight = 500.dp
         val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-        val expandedHeight = maxOf(screenHeightDp - 40.dp, 320.dp)
+        val expandedHeight = maxOf(screenHeightDp - 40.dp, 320.dp).coerceAtMost(800.dp)
         val targetHeight = if (sheetExpanded) expandedHeight else collapsedHeight
         val animatedHeight by animateDpAsState(targetHeight)
 
@@ -154,7 +171,7 @@ fun CalendarScreen(
 
                 if (dayTasks.isEmpty() && dayEvents.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Không có việc trong ngày này", color = NeumorphicColors.textSecondary)
+                        Text(stringResource(R.string.no_items_today), color = NeumorphicColors.textSecondary)
                     }
                 } else {
                     LazyColumn(
@@ -192,6 +209,7 @@ fun CalendarScreen(
                                 is CalendarListItem.TaskItem -> {
                                     CompactTaskItem(
                                         task = item.task,
+                                        collectionNameMap = collectionNameMap,
                                         onToggle = { onTaskToggle(item.task.id) },
                                         onDelete = { onTaskDelete(item.task.id) }
                                     )
@@ -199,7 +217,7 @@ fun CalendarScreen(
                             }
 
                             if (index != combinedItems.lastIndex) {
-                                Divider(
+                                HorizontalDivider(
                                     color = NeumorphicColors.background.copy(alpha = 0.12f),
                                     thickness = 0.5.dp
                                 )
@@ -262,9 +280,9 @@ private fun CompactMonthGrid(
                     Log.e("CalendarScreen", "Lunar conversion arithmetic error for date=$date: ${ex.message}", ex)
                     m[d] = null
                 } catch (ex: Exception) {
-                    // Unexpected exception - log and rethrow so programming errors are visible during development
+                    // Unexpected exception - log; only rethrow in debug to avoid crashing production
                     Log.e("CalendarScreen", "Unexpected error converting lunar for date=$date", ex)
-                    throw ex
+                    if (BuildConfig.DEBUG) throw ex else m[d] = null
                 }
             }
             m
@@ -276,7 +294,8 @@ private fun CompactMonthGrid(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN").forEach { dow ->
+            val weekdayLabels = stringArrayResource(id = R.array.weekday_short)
+            weekdayLabels.forEach { dow ->
                 Text(
                     text = dow,
                     fontSize = 12.sp,
@@ -419,7 +438,12 @@ private fun Dot(color: androidx.compose.ui.graphics.Color) {
 }
 
 @Composable
-private fun CompactTaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun CompactTaskItem(
+    task: Task,
+    collectionNameMap: Map<Int, String>,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
+) {
     // Slim list tile: left time (if none -> small placeholder), middle title + meta, right checkbox
     Row(
         Modifier
@@ -429,7 +453,7 @@ private fun CompactTaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Un
     ) {
         // Left: time (we only have date in Task; show 'All day' as compact label)
         Text(
-            text = "All day",
+            text = stringResource(R.string.all_day),
             fontSize = 12.sp,
             color = NeumorphicColors.textSecondary,
             modifier = Modifier.width(52.dp),
@@ -443,27 +467,38 @@ private fun CompactTaskItem(task: Task, onToggle: () -> Unit, onDelete: () -> Un
             Spacer(modifier = Modifier.height(2.dp))
             // Secondary meta: show priority + maybe collection id if available
             val meta = buildString {
-                append(when (task.priority) {
-                    Priority.HIGH -> "Cao"
-                    Priority.NORMAL -> "Bình thường"
-                    Priority.LOW -> "Thấp"
-                })
-                if (task.collectionId != null) append(" • Danh mục ${task.collectionId}")
+                val priorityLabel = when (task.priority) {
+                    Priority.HIGH -> stringResource(R.string.priority_high)
+                    Priority.NORMAL -> stringResource(R.string.priority_normal)
+                    Priority.LOW -> stringResource(R.string.priority_low)
+                }
+                append(priorityLabel)
+                task.collectionId?.let { cid ->
+                    val name = collectionNameMap[cid] ?: cid.toString()
+                    append(" • ")
+                    append(stringResource(R.string.collection_prefix, name))
+                }
             }
             Text(meta, fontSize = 12.sp, color = NeumorphicColors.textSecondary)
         }
 
-        // Right: subtle checkbox (small Card)
-        Card(
-            modifier = Modifier.size(28.dp),
-            shape = RoundedCornerShape(6.dp),
-            colors = CardDefaults.cardColors(containerColor = if (task.isCompleted) NeumorphicColors.accentMint else NeumorphicColors.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Box(modifier = Modifier.fillMaxSize().clickable { onToggle() }, contentAlignment = Alignment.Center) {
-                if (task.isCompleted) {
-                    Icon(Icons.Default.Check, contentDescription = "Done", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(16.dp))
+        // Right: subtle checkbox (small Card) + delete button
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Card(
+                modifier = Modifier.size(28.dp),
+                shape = RoundedCornerShape(6.dp),
+                colors = CardDefaults.cardColors(containerColor = if (task.isCompleted) NeumorphicColors.accentMint else NeumorphicColors.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Box(modifier = Modifier.fillMaxSize().clickable { onToggle() }, contentAlignment = Alignment.Center) {
+                    if (task.isCompleted) {
+                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.cd_done), tint = NeumorphicColors.textPrimary, modifier = Modifier.size(16.dp))
+                    }
                 }
+            }
+
+            IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete), tint = NeumorphicColors.textSecondary, modifier = Modifier.size(16.dp))
             }
         }
     }

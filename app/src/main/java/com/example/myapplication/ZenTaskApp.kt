@@ -134,8 +134,9 @@ fun ZenTaskApp() {
                         }
                     )
                     NavigationItem.CALENDAR -> CalendarScreen(
-                        tasks,
-                        { id ->
+                        tasks = tasks,
+                        collections = collections,
+                        onTaskToggle = { id ->
                             coroutineScope.launch {
                                 try {
                                     val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
@@ -154,7 +155,7 @@ fun ZenTaskApp() {
                                 }
                             }
                         },
-                        { id ->
+                        onTaskDelete = { id ->
                             coroutineScope.launch {
                                 try {
                                     withContext(Dispatchers.IO) { taskDao.deleteById(id) }
