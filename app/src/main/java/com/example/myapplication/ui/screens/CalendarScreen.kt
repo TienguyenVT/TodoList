@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,11 +39,11 @@ import com.example.myapplication.model.Task
 import com.example.myapplication.model.FestivalUtils
 import com.example.myapplication.model.Event
 import com.example.myapplication.ui.theme.NeumorphicColors
+import android.content.pm.ApplicationInfo
 import android.util.Log
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import com.example.myapplication.BuildConfig
 
 @Composable
 fun CalendarScreen(
@@ -243,6 +244,10 @@ private fun CompactMonthGrid(
     onSelectDate: (LocalDate) -> Unit,
     onToggleMonth: () -> Unit
 ) {
+    val context = LocalContext.current
+    val isDebuggable = remember(context) {
+        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    }
     val firstOfMonth = yearMonth.atDay(1)
     val daysInMonth = yearMonth.lengthOfMonth()
     val startOffset = (firstOfMonth.dayOfWeek.value + 6) % 7 // Monday=0 .. Sunday=6
@@ -282,7 +287,7 @@ private fun CompactMonthGrid(
                 } catch (ex: Exception) {
                     // Unexpected exception - log; only rethrow in debug to avoid crashing production
                     Log.e("CalendarScreen", "Unexpected error converting lunar for date=$date", ex)
-                    if (BuildConfig.DEBUG) throw ex else m[d] = null
+                    if (isDebuggable) throw ex else m[d] = null
                 }
             }
             m
