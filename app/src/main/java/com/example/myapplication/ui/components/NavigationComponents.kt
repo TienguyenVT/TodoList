@@ -1,5 +1,8 @@
 package com.example.myapplication.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,13 +17,21 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.myapplication.R
 import com.example.myapplication.model.NavigationItem
 import com.example.myapplication.ui.theme.NeumorphicColors
 
@@ -65,6 +76,142 @@ fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationIt
 }
 
 @Composable
+fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) -> Unit) {
+    val tabCount = 4
+    val catWidth = 64.dp
+    val rowHorizontalPadding = 12.dp
+
+    // Root: we keep the same outer padding as the old bottom bar.
+    // The cat is drawn OUTSIDE of the Card (bottom bar) as an overlay.
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
+        val maxWidth = maxWidth
+
+        val selectedIndex = when (currentScreen) {
+            NavigationItem.MY_DAY -> 0
+            NavigationItem.CALENDAR -> 1
+            NavigationItem.COLLECTIONS -> 2
+            NavigationItem.SETTINGS -> 3
+        }
+
+        var previousIndex by remember { mutableStateOf(selectedIndex) }
+        var facingRight by remember { mutableStateOf(true) }
+
+        // --- Coordinate calculation for the cat mascot ---
+        // The Row inside the Card uses a horizontal padding.
+        // So the actual coordinate space for the icons is: (maxWidth - 2 * rowHorizontalPadding).
+        // sectionWidth  = rowWidth / tabCount
+        // targetCenter  = rowHorizontalPadding + (index * sectionWidth) + (sectionWidth / 2)
+        // targetOffsetX = targetCenter - (catWidth / 2)
+        val rowWidth = maxWidth - rowHorizontalPadding * 2
+        val sectionWidth = rowWidth / tabCount
+        val targetCenter = rowHorizontalPadding + sectionWidth * selectedIndex + sectionWidth / 2
+        val targetOffsetX = targetCenter - catWidth / 2
+
+        val animatedOffsetX by animateDpAsState(
+            targetValue = targetOffsetX,
+            animationSpec = spring(
+                dampingRatio = 0.6f,
+                stiffness = Spring.StiffnessMediumLow
+            ),
+            label = "catOffsetX"
+        )
+
+        LaunchedEffect(selectedIndex) {
+            if (selectedIndex > previousIndex) {
+                facingRight = true
+            } else if (selectedIndex < previousIndex) {
+                facingRight = false
+            }
+            previousIndex = selectedIndex
+        }
+
+        // Inertia tilt: cat leans opposite to movement direction while it is "lagging"
+        val diff = (animatedOffsetX - targetOffsetX).value
+        val maxTilt = 15f
+        val distanceForMaxTilt = sectionWidth.value.coerceAtLeast(1f)
+        val rawTilt = if (kotlin.math.abs(diff) < 0.5f) {
+            0f
+        } else {
+            (diff / distanceForMaxTilt).coerceIn(-1f, 1f) * maxTilt
+        }
+        val tiltDegrees = rawTilt.coerceIn(-maxTilt, maxTilt)
+
+        // Layer 0: bottom bar
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(30.dp),
+            colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = rowHorizontalPadding, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    NavItem(
+                        icon = Icons.Filled.Home,
+                        isSelected = currentScreen == NavigationItem.MY_DAY,
+                        onClick = { onNavigate(NavigationItem.MY_DAY) }
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    NavItem(
+                        icon = Icons.Filled.DateRange,
+                        isSelected = currentScreen == NavigationItem.CALENDAR,
+                        onClick = { onNavigate(NavigationItem.CALENDAR) }
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    NavItem(
+                        icon = Icons.Filled.List,
+                        isSelected = currentScreen == NavigationItem.COLLECTIONS,
+                        onClick = { onNavigate(NavigationItem.COLLECTIONS) }
+                    )
+                }
+
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    NavItem(
+                        icon = Icons.Filled.Settings,
+                        isSelected = currentScreen == NavigationItem.SETTINGS,
+                        onClick = { onNavigate(NavigationItem.SETTINGS) }
+                    )
+                }
+            }
+        }
+
+        // Layer 1: cat overlay ABOVE the bar.
+        // We align the cat's BOTTOM edge to the TOP edge of the Card by offsetting it by -catWidth.
+        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cat))
+        val progress by animateLottieCompositionAsState(
+            composition = composition,
+            iterations = LottieConstants.IterateForever
+        )
+
+        Box(
+            modifier = Modifier
+                .size(catWidth)
+                .offset(x = animatedOffsetX, y = -catWidth)
+                .scale(scaleX = if (facingRight) 1f else -1f, scaleY = 1f)
+                .rotate(tiltDegrees),
+            contentAlignment = Alignment.Center
+        ) {
+            LottieAnimation(
+                composition = composition,
+                progress = { progress }
+            )
+        }
+    }
+}
+
+@Composable
 fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.size(48.dp).clickable { onClick() },
@@ -73,7 +220,12 @@ fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 4.dp)
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary)
+            val tintColor = if (isSelected) {
+                NeumorphicColors.textPrimary.copy(alpha = 0.5f)
+            } else {
+                NeumorphicColors.textSecondary
+            }
+            Icon(icon, null, tint = tintColor)
         }
     }
 }

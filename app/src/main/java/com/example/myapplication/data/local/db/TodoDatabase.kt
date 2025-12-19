@@ -51,42 +51,7 @@ abstract class TodoDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 val instance = INSTANCE ?: return
-
-                CoroutineScope(Dispatchers.IO).launch {
-                    val groupDao = instance.taskGroupDao()
-                    val taskDao = instance.taskDao()
-
-                    val workGroupId = groupDao.upsert(
-                        TaskGroup(
-                            groupName = "Work Project",
-                            groupColor = 0xFF3F51B5.toInt(),
-                            description = "Sample group"
-                        )
-                    ).toInt()
-
-                    groupDao.upsert(
-                        TaskGroup(
-                            groupName = "Vacation",
-                            groupColor = 0xFFFF9800.toInt(),
-                            description = null
-                        )
-                    )
-
-                    taskDao.upsert(
-                        Task(
-                            title = "Welcome to ZenTask",
-                            description = "This is a pre-populated task.",
-                            progressNotes = null,
-                            dueDate = null,
-                            urlLink = null,
-                            imagePath = null,
-                            status = 0,
-                            priority = 1,
-                            groupId = workGroupId
-                        )
-                    )
                 }
-            }
         }
     }
 }

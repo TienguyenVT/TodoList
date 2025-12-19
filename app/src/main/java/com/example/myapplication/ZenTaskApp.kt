@@ -31,7 +31,7 @@ import com.example.myapplication.model.Collection as UiCollection
 import com.example.myapplication.model.NavigationItem
 import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
-import com.example.myapplication.ui.components.NeumorphicBottomNav
+import com.example.myapplication.ui.components.MascotBottomNav
 import com.example.myapplication.ui.components.NeumorphicFAB
 import com.example.myapplication.ui.screens.*
 import com.example.myapplication.ui.screens.home.kanban.KanbanHomeScreen
@@ -237,7 +237,7 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                     animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
                 )
             ) {
-                NeumorphicBottomNav(currentScreen) { currentScreen = it }
+                MascotBottomNav(currentScreen) { currentScreen = it }
             }
         }
 
