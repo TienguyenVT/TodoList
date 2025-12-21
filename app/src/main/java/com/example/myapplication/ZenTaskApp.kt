@@ -27,6 +27,7 @@ import com.example.myapplication.ui.components.ZenTaskContent
 import com.example.myapplication.ui.sheets.AddCollectionSheet
 import com.example.myapplication.ui.sheets.AddTaskSheet
 import com.example.myapplication.ui.theme.NeumorphicColors
+import com.example.myapplication.utils.showToast
 import java.time.LocalDate
 import java.time.LocalDateTime
 import com.example.myapplication.utils.PerfLogger
@@ -151,7 +152,7 @@ private fun ZenTaskCommandDeck(appState: com.example.myapplication.ui.state.ZenT
             },
             onLogoutClick = {
                 appState.onMenuAction {
-                    appState.showToast("Logout Clicked")
+                    appState.context.showToast("Logout Clicked")
                 }
             }
         )

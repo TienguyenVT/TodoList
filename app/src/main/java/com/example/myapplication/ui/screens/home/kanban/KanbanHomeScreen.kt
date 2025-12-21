@@ -27,39 +27,7 @@ fun KanbanHomeScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                val completedCount = tasks.count { it.isCompleted }
-                val totalCount = tasks.size
-
-                if (maxWidth < 420.dp) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.tasks_completed_format, completedCount, totalCount),
-                            fontSize = 14.sp,
-                            color = NeumorphicColors.textSecondary
-                        )
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.tasks_completed_format, completedCount, totalCount),
-                            fontSize = 14.sp,
-                            color = NeumorphicColors.textSecondary
-                        )
-                    }
-                }
-            }
+            KanbanHeader(tasks)
 
             // Kanban Board
             KanbanBoard(
@@ -72,5 +40,42 @@ fun KanbanHomeScreen(
         }
 
         // FAB removed from Home tab per request
+    }
+}
+
+@Composable
+private fun KanbanHeader(tasks: List<Task>) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+    ) {
+        val completedCount = tasks.count { it.isCompleted }
+        val totalCount = tasks.size
+
+        if (maxWidth < 420.dp) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.tasks_completed_format, completedCount, totalCount),
+                    fontSize = 14.sp,
+                    color = NeumorphicColors.textSecondary
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.tasks_completed_format, completedCount, totalCount),
+                    fontSize = 14.sp,
+                    color = NeumorphicColors.textSecondary
+                )
+            }
+        }
     }
 }

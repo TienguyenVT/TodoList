@@ -22,6 +22,7 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import android.database.SQLException
+import com.example.myapplication.utils.showToast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 
@@ -131,9 +132,7 @@ class ZenTaskAppState(
         isMenuVisible = false
     }
 
-    fun showToast(message: String) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
+
 
     fun addTask(request: AddTaskRequest) {
         coroutineScope.launch {
@@ -150,7 +149,7 @@ class ZenTaskAppState(
 
                 if (wasInvalidGroup) {
                     Log.w(TAG, "Add task: groupId=$targetCollectionId not found; saving as uncategorized")
-                    showToast("Danh mục không còn tồn tại, sẽ lưu vào Không phân loại")
+                    context.showToast("Danh mục không còn tồn tại, sẽ lưu vào Không phân loại")
                 }
 
                 withContext(Dispatchers.IO) {
@@ -172,7 +171,7 @@ class ZenTaskAppState(
                 throw e
             } catch (e: SQLException) {
                 Log.e(TAG, "Add task failed", e)
-                showToast("Lỗi khi thêm công việc")
+                context.showToast("Lỗi khi thêm công việc")
             }
         }
     }
@@ -193,7 +192,7 @@ class ZenTaskAppState(
                 throw e
             } catch (e: SQLException) {
                 Log.e(TAG, "Add collection failed", e)
-                showToast("Lỗi khi tạo danh mục")
+                context.showToast("Lỗi khi tạo danh mục")
             }
         }
     }
@@ -204,7 +203,7 @@ class ZenTaskAppState(
                 val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
                 if (current == null) {
                     Log.w(TAG, "Toggle task failed: taskId=$id not found")
-                    showToast("Không tìm thấy công việc")
+                    context.showToast("Không tìm thấy công việc")
                 } else {
                     val newStatus = if (current.status == 1) {
                         lastNonCompletedStatus.remove(id) ?: 0
@@ -221,7 +220,7 @@ class ZenTaskAppState(
                 throw e
             } catch (e: SQLException) {
                 Log.e(TAG, "Toggle task failed: taskId=$id", e)
-                showToast("Lỗi khi cập nhật công việc")
+                context.showToast("Lỗi khi cập nhật công việc")
             }
         }
     }
@@ -235,7 +234,7 @@ class ZenTaskAppState(
                 throw e
             } catch (e: SQLException) {
                 Log.e(TAG, "Delete task failed: taskId=$id", e)
-                showToast("Lỗi khi xoá công việc")
+                context.showToast("Lỗi khi xoá công việc")
             }
         }
     }
@@ -243,30 +242,37 @@ class ZenTaskAppState(
     fun changeTaskStatus(id: Int, column: KanbanColumn) {
         coroutineScope.launch {
             try {
-                val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                if (current != null) {
-                    val newStatus = when (column) {
-                        KanbanColumn.COMPLETED -> 1
-                        KanbanColumn.IN_PROGRESS -> 2
-                        KanbanColumn.UNCOMPLETED -> 0
-                    }
-
-                    withContext(Dispatchers.IO) {
-                        taskDao.update(current.copy(status = newStatus))
-                    }
-
-                    if (newStatus == 1 && current.status != 1) {
-                        lastNonCompletedStatus[id] = current.status
-                    } else if (newStatus != 1) {
-                        lastNonCompletedStatus[id] = newStatus
-                    }
-                }
+                processStatusChange(id, column)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: SQLException) {
                 Log.e(TAG, "Change status failed: taskId=$id", e)
-                showToast("Lỗi khi cập nhật trạng thái")
+                context.showToast("Lỗi khi cập nhật trạng thái")
             }
+        }
+    }
+
+    private suspend fun processStatusChange(id: Int, column: KanbanColumn) {
+        val current = withContext(Dispatchers.IO) { taskDao.getById(id) } ?: return
+        
+        val newStatus = when (column) {
+            KanbanColumn.COMPLETED -> 1
+            KanbanColumn.IN_PROGRESS -> 2
+            KanbanColumn.UNCOMPLETED -> 0
+        }
+        
+        withContext(Dispatchers.IO) {
+            taskDao.update(current.copy(status = newStatus))
+        }
+        
+        updateNonCompletedStatus(id, current.status, newStatus)
+    }
+
+    private fun updateNonCompletedStatus(id: Int, oldStatus: Int, newStatus: Int) {
+        if (newStatus == 1 && oldStatus != 1) {
+            lastNonCompletedStatus[id] = oldStatus
+        } else if (newStatus != 1) {
+            lastNonCompletedStatus[id] = newStatus
         }
     }
 }

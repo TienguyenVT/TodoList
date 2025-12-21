@@ -215,9 +215,18 @@ private fun MascotTabRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // FIXED: Using single component for standard nav items to reduce duplication
-            StandardNavItemSlot(NavigationItem.CALENDAR, Icons.Filled.DateRange, state.currentScreen, state.isMenuOpen, actions.onNavigate, "Calendar")
-            StandardNavItemSlot(NavigationItem.COLLECTIONS, Icons.Filled.List, state.currentScreen, state.isMenuOpen, actions.onNavigate, "Collections")
-            StandardNavItemSlot(NavigationItem.MY_DAY, Icons.Filled.Home, state.currentScreen, state.isMenuOpen, actions.onNavigate, "My Day")
+            StandardNavItemSlot(
+                SlotConfig(NavigationItem.CALENDAR, Icons.Filled.DateRange, "Calendar"),
+                state, actions.onNavigate
+            )
+            StandardNavItemSlot(
+                SlotConfig(NavigationItem.COLLECTIONS, Icons.Filled.List, "Collections"),
+                state, actions.onNavigate
+            )
+            StandardNavItemSlot(
+                SlotConfig(NavigationItem.MY_DAY, Icons.Filled.Home, "My Day"),
+                state, actions.onNavigate
+            )
 
             // Dynamic Slot
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -239,21 +248,24 @@ private fun MascotTabRow(
     }
 }
 
+private data class SlotConfig(
+    val item: NavigationItem,
+    val icon: ImageVector,
+    val description: String
+)
+
 @Composable
 private fun RowScope.StandardNavItemSlot(
-    item: NavigationItem,
-    icon: ImageVector,
-    currentScreen: NavigationItem,
-    isMenuOpen: Boolean,
-    onNavigate: (NavigationItem) -> Unit,
-    contentDescription: String
+    config: SlotConfig,
+    state: MascotNavState,
+    onNavigate: (NavigationItem) -> Unit
 ) {
     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
         NavItem(
-            icon = icon,
-            isSelected = !isMenuOpen && currentScreen == item,
-            onClick = { onNavigate(item) },
-            contentDescription = contentDescription
+            icon = config.icon,
+            isSelected = !state.isMenuOpen && state.currentScreen == config.item,
+            onClick = { onNavigate(config.item) },
+            contentDescription = config.description
         )
     }
 }

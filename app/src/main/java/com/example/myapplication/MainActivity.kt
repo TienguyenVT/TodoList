@@ -27,26 +27,26 @@ class MainActivity : ComponentActivity() {
 
         // Customize the exit animation: zoom-in + fade-out on the splash icon
         splashScreen.setOnExitAnimationListener { provider ->
-            val iconView = provider.iconView ?: run {
+            val iconView = provider.iconView
+            if (iconView == null) {
                 provider.remove()
-                return@setOnExitAnimationListener
-            }
+            } else {
+                val scaleX = ObjectAnimator.ofFloat(iconView, View.SCALE_X, 1f, 3f)
+                val scaleY = ObjectAnimator.ofFloat(iconView, View.SCALE_Y, 1f, 3f)
+                val fadeOut = ObjectAnimator.ofFloat(iconView, View.ALPHA, 1f, 0f)
 
-            val scaleX = ObjectAnimator.ofFloat(iconView, View.SCALE_X, 1f, 3f)
-            val scaleY = ObjectAnimator.ofFloat(iconView, View.SCALE_Y, 1f, 3f)
-            val fadeOut = ObjectAnimator.ofFloat(iconView, View.ALPHA, 1f, 0f)
-
-            AnimatorSet().apply {
-                playTogether(scaleX, scaleY, fadeOut)
-                interpolator = AnticipateInterpolator()
-                duration = 500L
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        // Remove the splash screen once the animation completes
-                        provider.remove()
-                    }
-                })
-                start()
+                AnimatorSet().apply {
+                    playTogether(scaleX, scaleY, fadeOut)
+                    interpolator = AnticipateInterpolator()
+                    duration = 500L
+                    addListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            // Remove the splash screen once the animation completes
+                            provider.remove()
+                        }
+                    })
+                    start()
+                }
             }
         }
 
