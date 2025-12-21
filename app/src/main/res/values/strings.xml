@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">My Application</string>
     <string name="tasks_count">%1$d công việc</string>
+    <string name="tasks_completed_format">%1$d/%2$d hoàn thành</string>
     <string name="prev_month">Tháng trước</string>
     <string name="next_month">Tháng sau</string>
     <string name="no_items_today">Không có việc trong ngày này</string>
@@ -11,6 +12,8 @@
     <string name="collection_prefix">Danh mục %1$s</string>
     <string name="cd_done">Hoàn thành</string>
     <string name="cd_delete">Xoá</string>
+    <string name="cd_drag">Kéo</string>
+    <string name="task_count_format">%d công việc</string>
     <string-array name="weekday_short">
         <item>T2</item>
         <item>T3</item>

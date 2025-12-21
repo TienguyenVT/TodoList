@@ -18,9 +18,55 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.R
+import com.example.myapplication.model.Event
+import com.example.myapplication.model.LunarUtils
 import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
 import com.example.myapplication.ui.theme.NeumorphicColors
+
+data class DayState(
+    val isSelected: Boolean,
+    val isToday: Boolean,
+    val priorities: Set<Priority>,
+    val events: List<Event>,
+    val lunar: LunarUtils.LunarDate?
+)
+
+@Composable
+fun DayIndicators(dayState: DayState) {
+    if (dayState.priorities.isNotEmpty() || dayState.events.isNotEmpty()) {
+        Row(
+            modifier = Modifier.padding(bottom = 15.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (Priority.LOW in dayState.priorities) Dot(color = NeumorphicColors.priorityLow)
+            if (Priority.NORMAL in dayState.priorities) Dot(color = NeumorphicColors.priorityNormal)
+            if (Priority.HIGH in dayState.priorities) Dot(color = NeumorphicColors.priorityHigh)
+            if (dayState.events.isNotEmpty()) Dot(color = NeumorphicColors.accentBlue)
+        }
+    }
+}
+
+@Composable
+fun CalendarDayNumber(day: Int, dayState: DayState) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = day.toString(),
+            fontSize = 13.sp,
+            fontWeight = if (dayState.isToday) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (dayState.isSelected) MaterialTheme.colorScheme.onPrimary else NeumorphicColors.textPrimary
+        )
+
+        dayState.lunar?.let {
+            val lm = if (it.isLeap) "L${it.month}" else it.month.toString()
+            Text(
+                text = "${it.day}/${lm}",
+                fontSize = 9.sp,
+                color = NeumorphicColors.textSecondary
+            )
+        }
+    }
+}
 
 @Composable
 fun Dot(color: androidx.compose.ui.graphics.Color) {

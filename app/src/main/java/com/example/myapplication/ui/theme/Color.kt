@@ -16,6 +16,6 @@ object NeumorphicColors {
 
     // Priority colors for tasks
     val priorityLow = Color(0xFF48BB78)      // xanh lá
-    val priorityNormal = Color(0xFFED8936)   // vàng / cam
+    val priorityNormal = Color(0xFFFDD835)   // vàng / cam
     val priorityHigh = Color(0xFFE53E3E)     // đỏ
 }

@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import com.example.myapplication.utils.PerfLogger
 
 @Composable
 fun CalendarScreen(
@@ -195,6 +197,19 @@ private fun TaskListSection(
                 dayTasks.forEach { add(CalendarListItem.TaskItem(it)) }
             }
         }
+        
+        // OPTIMIZATION: Limit initial render to 15 items
+        val initialItemLimit = 15
+        var isFullyLoaded by remember { mutableStateOf(false) }
+        
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(150)
+            isFullyLoaded = true
+        }
+        
+        val limitedItems = remember(combinedItems, isFullyLoaded) {
+            if (isFullyLoaded) combinedItems else combinedItems.take(initialItemLimit)
+        }
 
         if (dayTasks.isEmpty() && dayEvents.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -208,7 +223,7 @@ private fun TaskListSection(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 itemsIndexed(
-                    items = combinedItems,
+                    items = limitedItems,
                     key = { index, item ->
                         when (item) {
                             is CalendarListItem.EventItem -> "ev_${index}_${item.event.title}"
@@ -226,13 +241,22 @@ private fun TaskListSection(
                         )
                     }
 
-                    if (index != combinedItems.lastIndex) {
+                    if (index != limitedItems.lastIndex) {
                         HorizontalDivider(
                             color = NeumorphicColors.background.copy(alpha = 0.12f),
                             thickness = 0.5.dp
                         )
                     }
                 }
+            }
+            
+            // Performance logging
+            androidx.compose.runtime.SideEffect {
+                PerfLogger.logRender(
+                    file = "CalendarScreen.kt",
+                    function = "TaskListSection",
+                    itemCount = combinedItems.size
+                )
             }
         }
     }
