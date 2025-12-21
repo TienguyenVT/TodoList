@@ -9,10 +9,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
- 
 import com.example.myapplication.model.Task
 import com.example.myapplication.ui.theme.NeumorphicColors
-
+import androidx.compose.ui.res.stringResource
+import com.example.myapplication.R
 @Composable
 fun KanbanHomeScreen(
     tasks: List<Task>,
@@ -53,11 +53,7 @@ fun KanbanHomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = androidx.compose.ui.res.stringResource(
-                                com.example.myapplication.R.string.tasks_completed_format,
-                                completedCount,
-                                totalCount
-                            ),
+                            text = stringResource(R.string.tasks_completed_format, completedCount, totalCount),
                             fontSize = 14.sp,
                             color = NeumorphicColors.textSecondary
                         )

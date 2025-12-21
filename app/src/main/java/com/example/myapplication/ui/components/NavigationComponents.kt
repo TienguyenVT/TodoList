@@ -59,25 +59,29 @@ fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationIt
                 NavItem(
                     icon = Icons.Filled.Home,
                     isSelected = currentScreen == NavigationItem.MY_DAY,
-                    onClick = { onNavigate(NavigationItem.MY_DAY) }
+                    onClick = { onNavigate(NavigationItem.MY_DAY) },
+                    contentDescription = "My Day"
                 )
 
                 NavItem(
                     icon = Icons.Filled.DateRange,
                     isSelected = currentScreen == NavigationItem.CALENDAR,
-                    onClick = { onNavigate(NavigationItem.CALENDAR) }
+                    onClick = { onNavigate(NavigationItem.CALENDAR) },
+                    contentDescription = "Calendar"
                 )
 
                 NavItem(
                     icon = Icons.Filled.List,
                     isSelected = currentScreen == NavigationItem.COLLECTIONS,
-                    onClick = { onNavigate(NavigationItem.COLLECTIONS) }
+                    onClick = { onNavigate(NavigationItem.COLLECTIONS) },
+                    contentDescription = "Collections"
                 )
 
                 NavItem(
                     icon = Icons.Filled.Settings,
                     isSelected = currentScreen == NavigationItem.SETTINGS,
-                    onClick = { onNavigate(NavigationItem.SETTINGS) }
+                    onClick = { onNavigate(NavigationItem.SETTINGS) },
+                    contentDescription = "Settings"
                 )
             }
         }
@@ -211,9 +215,9 @@ private fun MascotTabRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // FIXED: Using single component for standard nav items to reduce duplication
-            StandardNavItemSlot(NavigationItem.CALENDAR, Icons.Filled.DateRange, state.currentScreen, state.isMenuOpen, actions.onNavigate)
-            StandardNavItemSlot(NavigationItem.COLLECTIONS, Icons.Filled.List, state.currentScreen, state.isMenuOpen, actions.onNavigate)
-            StandardNavItemSlot(NavigationItem.MY_DAY, Icons.Filled.Home, state.currentScreen, state.isMenuOpen, actions.onNavigate)
+            StandardNavItemSlot(NavigationItem.CALENDAR, Icons.Filled.DateRange, state.currentScreen, state.isMenuOpen, actions.onNavigate, "Calendar")
+            StandardNavItemSlot(NavigationItem.COLLECTIONS, Icons.Filled.List, state.currentScreen, state.isMenuOpen, actions.onNavigate, "Collections")
+            StandardNavItemSlot(NavigationItem.MY_DAY, Icons.Filled.Home, state.currentScreen, state.isMenuOpen, actions.onNavigate, "My Day")
 
             // Dynamic Slot
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -221,15 +225,15 @@ private fun MascotTabRow(
                                      state.currentScreen !in setOf(NavigationItem.CALENDAR, NavigationItem.COLLECTIONS, NavigationItem.MY_DAY)
 
                 if (state.dynamicSlotIcon != null) {
-                    NavItem(icon = state.dynamicSlotIcon, isSelected = isDynamicSelected, onClick = actions.onDynamicSlotClick)
+                    NavItem(icon = state.dynamicSlotIcon, isSelected = isDynamicSelected, onClick = actions.onDynamicSlotClick, contentDescription = "Dynamic Slot")
                 } else {
-                    NavItem(icon = Icons.Filled.Add, isSelected = false, onClick = actions.onDynamicSlotClick)
+                    NavItem(icon = Icons.Filled.Add, isSelected = false, onClick = actions.onDynamicSlotClick, contentDescription = "Add")
                 }
             }
 
             // Menu Trigger
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                NavItem(icon = Icons.Filled.Menu, isSelected = state.isMenuOpen, onClick = actions.onMenuClick)
+                NavItem(icon = Icons.Filled.Menu, isSelected = state.isMenuOpen, onClick = actions.onMenuClick, contentDescription = "Menu")
             }
         }
     }
@@ -241,13 +245,15 @@ private fun RowScope.StandardNavItemSlot(
     icon: ImageVector,
     currentScreen: NavigationItem,
     isMenuOpen: Boolean,
-    onNavigate: (NavigationItem) -> Unit
+    onNavigate: (NavigationItem) -> Unit,
+    contentDescription: String
 ) {
     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
         NavItem(
             icon = icon,
             isSelected = !isMenuOpen && currentScreen == item,
-            onClick = { onNavigate(item) }
+            onClick = { onNavigate(item) },
+            contentDescription = contentDescription
         )
     }
 }
@@ -288,7 +294,7 @@ private fun MascotOverlay(
 }
 
 @Composable
-fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
+fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit, contentDescription: String) {
     Card(
         modifier = Modifier
             .size(48.dp)
@@ -305,7 +311,7 @@ fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
             } else {
                 NeumorphicColors.textSecondary
             }
-            Icon(icon, null, tint = tintColor)
+            Icon(icon, contentDescription, tint = tintColor)
         }
     }
 }
