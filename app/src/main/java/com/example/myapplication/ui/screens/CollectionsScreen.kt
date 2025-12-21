@@ -27,6 +27,7 @@ import com.example.myapplication.model.Task
 import com.example.myapplication.ui.components.NeumorphicCard
 import com.example.myapplication.ui.components.TaskCard
 import com.example.myapplication.ui.theme.NeumorphicColors
+import com.example.myapplication.utils.PerfLogger
 
 @Composable
 fun CollectionsScreen(collections: List<Collection>, tasks: List<Task>, onCollectionClick: (Collection) -> Unit, onAddCollection: () -> Unit) {
@@ -42,6 +43,15 @@ fun CollectionsScreen(collections: List<Collection>, tasks: List<Task>, onCollec
                 val completed = tasks.filter { it.collectionId == collection.id && it.isCompleted }.size
                 CollectionCard(collection, count, completed) { onCollectionClick(collection) }
             }
+        }
+        
+        // Performance logging
+        androidx.compose.runtime.SideEffect {
+            PerfLogger.logRender(
+                file = "CollectionsScreen.kt",
+                function = "CollectionsScreen",
+                itemCount = collections.size
+            )
         }
     }
 }

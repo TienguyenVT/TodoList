@@ -44,11 +44,14 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 import java.time.LocalDate
 import java.time.Instant
 import java.time.ZoneId
+import com.example.myapplication.utils.PerfLogger
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
     var currentScreen by remember { mutableStateOf(NavigationItem.MY_DAY) }
+    // Deffered Rendering: Dùng state này cho nội dung bên dưới để delay việc load, nhường tài nguyên cho Animation Mèo chạy trước
+    var renderedScreen by remember { mutableStateOf(NavigationItem.MY_DAY) }
     var showAddTaskSheet by remember { mutableStateOf(false) }
     var showAddCollectionSheet by remember { mutableStateOf(false) }
 
@@ -91,6 +94,22 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
         if (currentScreen != NavigationItem.COLLECTIONS) {
             showAddTaskSheet = false
         }
+        android.util.Log.d("ZenTaskApp", "Screen changed to: $currentScreen. Waiting for debounce...")
+        PerfLogger.logAction(
+            file = "ZenTaskApp.kt",
+            function = "LaunchedEffect(currentScreen)",
+            action = "Screen changing to ${currentScreen.name}"
+        )
+        
+        // INCREASED (Final): Delay 350ms - chờ animation hoàn toàn kết thúc trước khi render content
+        // Việc này đảm bảo UI thread hoàn toàn rảnh rỗi cho animation Spring
+        delay(350) 
+        renderedScreen = currentScreen
+        android.util.Log.d("ZenTaskApp", "Rendered screen updated to: $renderedScreen")
+    }
+
+    SideEffect {
+        android.util.Log.d("ZenTaskApp", "Recomposing ZenTaskApp. Current: $currentScreen")
     }
 
     LaunchedEffect(Unit) {
@@ -171,56 +190,80 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
-                when (currentScreen) {
-                    NavigationItem.MY_DAY -> KanbanHomeScreen(
-                        tasks = tasks,
-                        collections = collectionNameMap,
-                        onTaskToggle = ::handleTaskToggle,
-                        onTaskDelete = ::handleTaskDelete,
-                        onTaskStatusChange = { id, column ->
-                            coroutineScope.launch {
-                                try {
-                                    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                                    if (current != null) {
-                                        val newStatus = when (column) {
-                                            KanbanColumn.COMPLETED -> 1 // completed
-                                            KanbanColumn.IN_PROGRESS -> 2 // in-progress
-                                            KanbanColumn.UNCOMPLETED -> 0 // uncompleted
-                                        }
+                // Track if content is still being rendered (during deferred load)
+                val isRendering = currentScreen != renderedScreen
+                
+                // Show skeleton placeholder during transition
+                if (isRendering) {
+                    when (currentScreen) {
+                        NavigationItem.MY_DAY -> com.example.myapplication.ui.components.SkeletonKanbanScreen(
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        NavigationItem.CALENDAR -> com.example.myapplication.ui.components.SkeletonTaskList(
+                            itemCount = 5,
+                            modifier = Modifier.fillMaxSize().padding(top = 100.dp)
+                        )
+                        else -> Box(Modifier.fillMaxSize()) // Empty placeholder for other screens
+                    }
+                }
+                
+                // Sử dụng Crossfade để chuyển đổi màn hình mượt mà hơn, tránh hiện tượng giật cục khi spam tab
+                androidx.compose.animation.Crossfade(
+                    targetState = renderedScreen, // Sử dụng renderedScreen (đã delay) thay vì currentScreen
+                    label = "ScreenTransition",
+                    animationSpec = tween(durationMillis = 300) // Thời gian chuyển cảnh hợp lý
+                ) { targetScreen ->
+                    when (targetScreen) {
+                        NavigationItem.MY_DAY -> KanbanHomeScreen(
+                            tasks = tasks,
+                            collections = collectionNameMap,
+                            onTaskToggle = ::handleTaskToggle,
+                            onTaskDelete = ::handleTaskDelete,
+                            onTaskStatusChange = { id, column ->
+                                coroutineScope.launch {
+                                    try {
+                                        val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                                        if (current != null) {
+                                            val newStatus = when (column) {
+                                                KanbanColumn.COMPLETED -> 1 // completed
+                                                KanbanColumn.IN_PROGRESS -> 2 // in-progress
+                                                KanbanColumn.UNCOMPLETED -> 0 // uncompleted
+                                            }
 
-                                        withContext(Dispatchers.IO) {
-                                            // Only change status; keep priority as user set
-                                            taskDao.update(
-                                                current.copy(status = newStatus)
-                                            )
-                                        }
+                                            withContext(Dispatchers.IO) {
+                                                // Only change status; keep priority as user set
+                                                taskDao.update(
+                                                    current.copy(status = newStatus)
+                                                )
+                                            }
 
-                                        if (newStatus == 1 && current.status != 1) {
-                                            lastNonCompletedStatus[id] = current.status
-                                        } else if (newStatus != 1) {
-                                            lastNonCompletedStatus[id] = newStatus
+                                            if (newStatus == 1 && current.status != 1) {
+                                                lastNonCompletedStatus[id] = current.status
+                                            } else if (newStatus != 1) {
+                                                lastNonCompletedStatus[id] = newStatus
+                                            }
                                         }
+                                    } catch (t: Throwable) {
+                                        Log.e(tag, "Change status failed: taskId=$id", t)
+                                        showToast("Lỗi khi cập nhật trạng thái")
                                     }
-                                } catch (t: Throwable) {
-                                    Log.e(tag, "Change status failed: taskId=$id", t)
-                                    showToast("Lỗi khi cập nhật trạng thái")
                                 }
                             }
-                        }
-                    )
-                    NavigationItem.CALENDAR -> CalendarScreen(
-                        tasks = tasks,
-                        collections = collections,
-                        onTaskToggle = ::handleTaskToggle,
-                        onTaskDelete = ::handleTaskDelete
-                    )
-                    NavigationItem.COLLECTIONS -> CollectionsScreen(
-                        collections,
-                        tasks,
-                        { selectedCollection = it },
-                        { showAddCollectionSheet = true }
-                    )
-                    NavigationItem.SETTINGS -> SettingsScreen()
+                        )
+                        NavigationItem.CALENDAR -> CalendarScreen(
+                            tasks = tasks,
+                            collections = collections,
+                            onTaskToggle = ::handleTaskToggle,
+                            onTaskDelete = ::handleTaskDelete
+                        )
+                        NavigationItem.COLLECTIONS -> CollectionsScreen(
+                            collections,
+                            tasks,
+                            { selectedCollection = it },
+                            { showAddCollectionSheet = true }
+                        )
+                        NavigationItem.SETTINGS -> SettingsScreen()
+                    }
                 }
             }
 
@@ -252,6 +295,11 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                         }
                     },
                     onNavigate = { item ->
+                        PerfLogger.logAction(
+                            file = "ZenTaskApp.kt",
+                            function = "MascotBottomNav.onNavigate",
+                            action = "Navigate to ${item.name}"
+                        )
                         isMenuVisible = false
                         currentScreen = item
                     }

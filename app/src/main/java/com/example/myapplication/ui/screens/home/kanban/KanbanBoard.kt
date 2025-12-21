@@ -40,6 +40,7 @@ import com.example.myapplication.R
 import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
 import com.example.myapplication.ui.theme.NeumorphicColors
+import com.example.myapplication.utils.PerfLogger
 import kotlin.math.roundToInt
 
 enum class KanbanColumn(val title: String) {
@@ -80,6 +81,28 @@ fun KanbanBoard(
             entry.value.map { KanbanTask(it, entry.key) }
         }
     }
+    
+    // OPTIMIZATION: Limit initial render to 15 items per column
+    // After initial render, progressively load all items
+    val INITIAL_ITEM_LIMIT = 15
+    var isFullyLoaded by remember { mutableStateOf(false) }
+    
+    // Delay full load to allow animation to complete first
+    LaunchedEffect(tasks) {
+        isFullyLoaded = false
+        kotlinx.coroutines.delay(150) // Wait for mascot animation
+        isFullyLoaded = true
+    }
+    
+    val limitedTasksByColumn = remember(tasksByColumn, isFullyLoaded) {
+        if (isFullyLoaded) {
+            tasksByColumn
+        } else {
+            tasksByColumn.mapValues { (_, tasks) ->
+                tasks.take(INITIAL_ITEM_LIMIT)
+            }
+        }
+    }
 
     // Track dragged item
     var dragInfo by remember { mutableStateOf<DragInfo?>(null) }
@@ -112,7 +135,7 @@ fun KanbanBoard(
             KanbanColumn.values().forEach { column ->
                 KanbanColumnCard(
                     column = column,
-                    tasks = tasksByColumn[column] ?: emptyList(),
+                    tasks = limitedTasksByColumn[column] ?: emptyList(),
                     collections = collections,
                     draggedItem = dragInfo?.item,
                     isDragOver = dragOverColumn == column,
@@ -336,6 +359,15 @@ private fun KanbanColumnCard(
                         onDelete = { onTaskDelete(kanbanTask.task.id) }
                     )
                 }
+            }
+            
+            // Performance logging
+            androidx.compose.runtime.SideEffect {
+                PerfLogger.logRender(
+                    file = "KanbanBoard.kt",
+                    function = "KanbanColumnCard(${column.title})",
+                    itemCount = tasks.size
+                )
             }
         }
     }

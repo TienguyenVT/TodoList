@@ -117,16 +117,58 @@ fun MascotBottomNav(
         val sectionWidth = rowWidth / tabCount
         val targetCenter = rowHorizontalPadding + sectionWidth * selectedIndex + sectionWidth / 2
         val targetOffsetX = targetCenter - catWidth / 2
-
-        // SỬA ĐỔI CHÍNH: Thêm hiệu ứng lắc nhẹ (Spring)
-        val animatedOffsetX by animateDpAsState(
-            targetValue = targetOffsetX,
-            animationSpec = spring(
-                dampingRatio = 0.65f,
-                stiffness = Spring.StiffnessMediumLow
-            ),
-            label = "catOffsetX"
-        )
+        
+        // === ADVANCED ANIMATION: Velocity-Preserving Spring ===
+        // Sử dụng Animatable với Spring để bảo toàn vận tốc khi target thay đổi (spam click)
+        val animatedOffsetX = remember { 
+            androidx.compose.animation.core.Animatable(targetOffsetX.value) 
+        }
+        
+        // Coroutine-based animation
+        LaunchedEffect(targetOffsetX) {
+            // Log target change
+            // android.util.Log.d("PerfDebug", "🎯 TARGET: ${targetOffsetX.value}dp")
+            
+            // Tính khoảng cách
+            val distance = kotlin.math.abs(targetOffsetX.value - animatedOffsetX.value)
+            
+            // Chỉ Snap nếu khoảng cách CỰC KỲ xa (> 1.5 lần chiều rộng màn hình - hiếm khi xảy ra)
+            // Việc snap ở khoảng cách ngắn (như 150dp) gây cảm giác giật cục
+            if (distance > 600f) {
+                animatedOffsetX.snapTo(targetOffsetX.value)
+            } else {
+                // Sử dụng Spring để có chuyển động tự nhiên và bảo toàn quán tính
+                // TUNED: 
+                // - Stiffness 400f: Giảm tốc độ (~15% chậm hơn so với 500-700f), tạo cảm giác "lướt"
+                // - Damping 0.75f: Nảy nhẹ (soft bounce) ở đích, không quá cứng nhưng không quá lỏng lẻo
+                animatedOffsetX.animateTo(
+                    targetValue = targetOffsetX.value,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.75f,
+                        stiffness = 50f
+                    )
+                )
+            }
+        }
+        
+        // Convert Animatable value thành Dp
+        val currentOffsetDp = animatedOffsetX.value.dp
+        
+        // === OPTIMIZED LOGGING ===
+        // Chỉ log khi thực sự có issue để giảm overhead cho UI Thread
+        var lastLogTime by remember { mutableStateOf(0L) }
+        androidx.compose.runtime.SideEffect {
+            val now = System.currentTimeMillis()
+            if (lastLogTime > 0) {
+                val delta = now - lastLogTime
+                // Chỉ warn nếu frame gap > 32ms (dropped > 2 frames)
+                if (delta > 32) { 
+                     // Dùng String builder đơn giản hoặc log ngắn gọn nhất
+                     android.util.Log.d("PerfDebug", "⚠️ DROP: ${delta}ms")
+                }
+            }
+            lastLogTime = now
+        }
 
         LaunchedEffect(selectedIndex) {
             if (selectedIndex > previousIndex) {
@@ -212,7 +254,7 @@ fun MascotBottomNav(
             }
         }
 
-        // Layer 1: Con mèo (Overlay)
+        // Layer 1: Con mèo (Overlay) - Hardware Accelerated
         val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cat))
         val progress by animateLottieCompositionAsState(
             composition = composition,
@@ -222,9 +264,18 @@ fun MascotBottomNav(
         Box(
             modifier = Modifier
                 .size(catWidth)
-                .offset(x = animatedOffsetX, y = -catWidth + yOffsetAdjustment)
+                .offset { 
+                    // OPTIMIZATION: Use lambda offset to skip Composition phase, running only in Layout phase
+                    // This is crucial for avoiding 60fps recomposition
+                    androidx.compose.ui.unit.IntOffset(
+                        x = animatedOffsetX.value.dp.roundToPx(), 
+                        y = (-catWidth + yOffsetAdjustment).roundToPx()
+                    ) 
+                }
                 .graphicsLayer {
-                    // Chỉ lật mặt, không xoay (rotation) hay dãn (scale) phức tạp
+                    // Hardware layer để animation chạy riêng biệt, không bị block bởi UI thread
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    // Lật mặt theo hướng di chuyển
                     scaleX = if (facingRight) 1f else -1f
                 },
             contentAlignment = Alignment.Center
