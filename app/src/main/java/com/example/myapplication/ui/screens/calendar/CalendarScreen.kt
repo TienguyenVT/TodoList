@@ -199,7 +199,7 @@ private fun TaskListSection(
         }
         
         // OPTIMIZATION: Limit initial render to 15 items
-        val INITIAL_ITEM_LIMIT = 15
+        val initialItemLimit = 15
         var isFullyLoaded by remember { mutableStateOf(false) }
         
         LaunchedEffect(combinedItems) {
@@ -209,7 +209,7 @@ private fun TaskListSection(
         }
         
         val limitedItems = remember(combinedItems, isFullyLoaded) {
-            if (isFullyLoaded) combinedItems else combinedItems.take(INITIAL_ITEM_LIMIT)
+            if (isFullyLoaded) combinedItems else combinedItems.take(initialItemLimit)
         }
 
         if (dayTasks.isEmpty() && dayEvents.isEmpty()) {

@@ -47,8 +47,7 @@ abstract class TodoDatabase : RoomDatabase() {
         private object PrepopulateCallback : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                val instance = INSTANCE ?: return
-                }
+            }
         }
     }
 }

@@ -1,16 +1,12 @@
 package com.example.myapplication
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import kotlinx.coroutines.delay
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,13 +29,7 @@ import com.example.myapplication.ui.state.addCollection
 import com.example.myapplication.ui.state.toggleTask
 import com.example.myapplication.ui.state.deleteTask
 import com.example.myapplication.ui.state.changeTaskStatus
-import java.time.LocalDate
-import java.time.LocalDateTime
-import com.example.myapplication.utils.PerfLogger
 import com.example.myapplication.model.Task
-import com.example.myapplication.model.Priority
-import com.example.myapplication.model.toUiTask
-import com.example.myapplication.model.toUiCollection
 import com.example.myapplication.ui.state.rememberZenTaskAppState
 
 

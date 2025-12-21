@@ -1,42 +1,22 @@
 package com.example.myapplication.ui.screens.home.kanban
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.example.myapplication.R
-import com.example.myapplication.model.Priority
 import com.example.myapplication.model.Task
 import com.example.myapplication.ui.theme.NeumorphicColors
-import com.example.myapplication.utils.PerfLogger
 import kotlin.math.roundToInt
 
 enum class KanbanColumn(val title: String) {
@@ -173,7 +153,7 @@ private fun rememberKanbanTasks(tasks: List<Task>): Map<KanbanColumn, List<Kanba
         }
     }
     
-    val INITIAL_ITEM_LIMIT = 15
+    val initialItemLimit = 15
     var isFullyLoaded by remember { mutableStateOf(false) }
     
     LaunchedEffect(tasks) {
@@ -184,7 +164,7 @@ private fun rememberKanbanTasks(tasks: List<Task>): Map<KanbanColumn, List<Kanba
     
     return remember(tasksByColumn, isFullyLoaded) {
         if (isFullyLoaded) tasksByColumn
-        else tasksByColumn.mapValues { (_, tasks) -> tasks.take(INITIAL_ITEM_LIMIT) }
+        else tasksByColumn.mapValues { (_, tasks) -> tasks.take(initialItemLimit) }
     }
 }
 

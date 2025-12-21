@@ -3,7 +3,6 @@ package com.example.myapplication.model
 import com.example.myapplication.data.local.db.entity.Task as DbTask
 import com.example.myapplication.data.local.db.entity.TaskGroup as DbTaskGroup
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import java.time.Instant
