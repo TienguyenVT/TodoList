@@ -103,20 +103,24 @@ fun KanbanBoard(
             }
     ) {
         KanbanColumnsLayout(
-            limitedTasksByColumn = limitedTasksByColumn,
-            collections = collections,
-            dragInfo = dragInfo,
-            dragOverColumn = dragOverColumn,
-            taskActions = taskActions,
-            onDragInfoChange = { newDragInfo -> dragInfo = newDragInfo },
-            onDragOverChange = { newDragOver -> 
-                 if (newDragOver != dragOverColumn && newDragOver != null) {
-                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                 }
-                 dragOverColumn = newDragOver
-            },
-            onColumnBoundsChange = { col, rect -> columnBounds[col] = rect },
-            columnBounds = columnBounds
+            uiState = KanbanBoardUiState(
+                tasksByColumn = limitedTasksByColumn,
+                collections = collections,
+                dragInfo = dragInfo,
+                dragOverColumn = dragOverColumn,
+                columnBounds = columnBounds
+            ),
+            callbacks = KanbanBoardCallbacks(
+                onDragInfoChange = { dragInfo = it },
+                onDragOverChange = { newDragOver -> 
+                     if (newDragOver != dragOverColumn && newDragOver != null) {
+                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                     }
+                     dragOverColumn = newDragOver
+                },
+                onColumnBoundsChange = { col, rect -> columnBounds[col] = rect }
+            ),
+            taskActions = taskActions
         )
 
         KanbanBoardOverlay(
@@ -181,15 +185,9 @@ private fun rememberKanbanTasks(tasks: List<Task>): Map<KanbanColumn, List<Kanba
 
 @Composable
 private fun KanbanColumnsLayout(
-    limitedTasksByColumn: Map<KanbanColumn, List<KanbanTask>>,
-    collections: Map<Int, String>,
-    dragInfo: DragInfo?,
-    dragOverColumn: KanbanColumn?,
-    taskActions: TaskActions,
-    onDragInfoChange: (DragInfo?) -> Unit,
-    onDragOverChange: (KanbanColumn?) -> Unit,
-    onColumnBoundsChange: (KanbanColumn, Rect) -> Unit,
-    columnBounds: Map<KanbanColumn, Rect>
+    uiState: KanbanBoardUiState,
+    callbacks: KanbanBoardCallbacks,
+    taskActions: TaskActions
 ) {
     val haptics = LocalHapticFeedback.current
     
@@ -199,36 +197,36 @@ private fun KanbanColumnsLayout(
             .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        KanbanColumn.values().forEach { column ->
-            val uiState = KanbanColumnUiState(
+        KanbanColumn.entries.forEach { column ->
+            val columnUiState = KanbanColumnUiState(
                 column = column,
-                tasks = limitedTasksByColumn[column] ?: emptyList(),
-                isDragOver = dragOverColumn == column,
-                draggedItem = dragInfo?.item
+                tasks = uiState.tasksByColumn[column] ?: emptyList(),
+                isDragOver = uiState.dragOverColumn == column,
+                draggedItem = uiState.dragInfo?.item
             )
 
             KanbanColumnCard(
-                uiState = uiState,
-                collections = collections,
-                onGloballyPositioned = { coords -> onColumnBoundsChange(column, coords.boundsInWindow()) },
+                uiState = columnUiState,
+                collections = uiState.collections,
+                onGloballyPositioned = { coords -> callbacks.onColumnBoundsChange(column, coords.boundsInWindow()) },
                 dragActions = DragActions(
                     onStart = { item, pointer, anchor ->
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        onDragInfoChange(DragInfo(item, pointer, anchor))
-                        onDragOverChange(columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
+                        callbacks.onDragInfoChange(DragInfo(item, pointer, anchor))
+                        callbacks.onDragOverChange(uiState.columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
                     },
                     onDrag = { pointer ->
-                        onDragInfoChange(dragInfo?.copy(pointerInWindow = pointer))
-                        onDragOverChange(columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
+                        callbacks.onDragInfoChange(uiState.dragInfo?.copy(pointerInWindow = pointer))
+                        callbacks.onDragOverChange(uiState.columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
                     },
                     onEnd = {
-                        val target = dragOverColumn
-                        val item = dragInfo?.item
+                        val target = uiState.dragOverColumn
+                        val item = uiState.dragInfo?.item
                         if (target != null && item != null && target != item.column) {
                             taskActions.onStatusChange?.invoke(item.task.id, target)
                         }
-                        onDragInfoChange(null)
-                        onDragOverChange(null)
+                        callbacks.onDragInfoChange(null)
+                        callbacks.onDragOverChange(null)
                     }
                 ),
                 taskActions = taskActions,
@@ -240,6 +238,20 @@ private fun KanbanColumnsLayout(
         }
     }
 }
+
+private data class KanbanBoardUiState(
+    val tasksByColumn: Map<KanbanColumn, List<KanbanTask>>,
+    val collections: Map<Int, String>,
+    val dragInfo: DragInfo?,
+    val dragOverColumn: KanbanColumn?,
+    val columnBounds: Map<KanbanColumn, Rect>
+)
+
+private data class KanbanBoardCallbacks(
+    val onDragInfoChange: (DragInfo?) -> Unit,
+    val onDragOverChange: (KanbanColumn?) -> Unit,
+    val onColumnBoundsChange: (KanbanColumn, Rect) -> Unit
+)
 
 
 data class KanbanColumnUiState(
@@ -274,12 +286,14 @@ private fun DraggedTaskOverlay(
             task = task,
             collectionName = task.collectionId?.let { collections[it] ?: it.toString() },
             isOverlay = true,
-            onToggle = {},
-            onDelete = {},
-            onHandlePositioned = {},
-            onDragStart = {},
-            onDrag = {},
-            onDragEnd = {}
+            callbacks = KanbanTaskCallbacks(
+                onToggle = {},
+                onDelete = {},
+                onHandlePositioned = {},
+                onDragStart = {},
+                onDrag = {},
+                onDragEnd = {}
+            )
         )
     }
 }
@@ -406,20 +420,22 @@ private fun DraggableKanbanTask(
             task = task,
             collectionName = task.collectionId?.let { collections[it] ?: it.toString() },
             isOverlay = false,
-            onToggle = { taskActions.onToggle(task.id) },
-            onDelete = { taskActions.onDelete(task.id) },
-            onHandlePositioned = { handleRectInWindow = it.boundsInWindow() },
-            onDragStart = { offset ->
-                val card = cardRectInWindow
-                val handle = handleRectInWindow
-                if (card != null && handle != null) {
-                    val pointerInWindow = handle.topLeft + offset
-                    val anchorInItem = pointerInWindow - card.topLeft
-                    dragActions.onStart(kanbanTask, pointerInWindow, anchorInItem)
-                }
-            },
-            onDrag = dragActions.onDrag,
-            onDragEnd = dragActions.onEnd
+            callbacks = KanbanTaskCallbacks(
+                onToggle = { taskActions.onToggle(task.id) },
+                onDelete = { taskActions.onDelete(task.id) },
+                onHandlePositioned = { handleRectInWindow = it.boundsInWindow() },
+                onDragStart = { offset ->
+                    val card = cardRectInWindow
+                    val handle = handleRectInWindow
+                    if (card != null && handle != null) {
+                        val pointerInWindow = handle.topLeft + offset
+                        val anchorInItem = pointerInWindow - card.topLeft
+                        dragActions.onStart(kanbanTask, pointerInWindow, anchorInItem)
+                    }
+                },
+                onDrag = dragActions.onDrag,
+                onDragEnd = dragActions.onEnd
+            )
         )
     }
 }
@@ -429,12 +445,7 @@ private fun KanbanTaskContent(
     task: Task,
     collectionName: String?,
     isOverlay: Boolean,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit,
-    onHandlePositioned: (LayoutCoordinates) -> Unit,
-    onDragStart: (Offset) -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit
+    callbacks: KanbanTaskCallbacks
 ) {
     val priorityColor = when (task.priority) {
         Priority.HIGH -> NeumorphicColors.priorityHigh
@@ -471,6 +482,7 @@ private fun KanbanTaskContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Collection Name
                 Column(modifier = Modifier.weight(1f)) {
                     if (collectionName != null) {
                         Text(
@@ -481,64 +493,87 @@ private fun KanbanTaskContent(
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!isOverlay) {
-                        IconButton(onClick = onToggle, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = stringResource(R.string.cd_done),
-                                tint = if (task.isCompleted) NeumorphicColors.accentMint else NeumorphicColors.textSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.cd_delete),
-                                tint = NeumorphicColors.textSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-
-                        // Interactive Drag handle
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .onGloballyPositioned(onHandlePositioned)
-                                .pointerInput(Unit) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = onDragStart,
-                                        onDragEnd = onDragEnd,
-                                        onDragCancel = onDragEnd,
-                                        onDrag = { change, _ -> onDrag(change.position) }
-                                    )
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DragHandle,
-                                contentDescription = stringResource(R.string.cd_drag),
-                                tint = NeumorphicColors.textSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    } else {
-                        // Overlay Drag handle (Visual only)
-                        Box(
-                            modifier = Modifier.size(40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DragHandle,
-                                contentDescription = stringResource(R.string.cd_drag),
-                                tint = NeumorphicColors.textSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+                // Actions and Drag Handle
+                TaskControlRow(
+                    isCompleted = task.isCompleted,
+                    isOverlay = isOverlay,
+                    callbacks = callbacks
+                )
             }
         }
     }
+}
+
+data class KanbanTaskCallbacks(
+    val onToggle: () -> Unit,
+    val onDelete: () -> Unit,
+    val onHandlePositioned: (LayoutCoordinates) -> Unit,
+    val onDragStart: (Offset) -> Unit,
+    val onDrag: (Offset) -> Unit,
+    val onDragEnd: () -> Unit
+)
+
+@Composable
+private fun TaskControlRow(
+    isCompleted: Boolean,
+    isOverlay: Boolean,
+    callbacks: KanbanTaskCallbacks
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (!isOverlay) {
+            IconButton(onClick = callbacks.onToggle, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = stringResource(R.string.cd_done),
+                    tint = if (isCompleted) NeumorphicColors.accentMint else NeumorphicColors.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            IconButton(onClick = callbacks.onDelete, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.cd_delete),
+                    tint = NeumorphicColors.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            // Interactive Drag handle
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .onGloballyPositioned(callbacks.onHandlePositioned)
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = callbacks.onDragStart,
+                            onDragEnd = callbacks.onDragEnd,
+                            onDragCancel = callbacks.onDragEnd,
+                            onDrag = { change, _ -> callbacks.onDrag(change.position) }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                DragHandleIcon()
+            }
+        } else {
+            // Overlay Drag handle (Visual only)
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                DragHandleIcon()
+            }
+        }
+    }
+}
+
+@Composable
+private fun DragHandleIcon() {
+    Icon(
+        imageVector = Icons.Default.DragHandle,
+        contentDescription = stringResource(R.string.cd_drag),
+        tint = NeumorphicColors.textSecondary,
+        modifier = Modifier.size(20.dp)
+    )
 }

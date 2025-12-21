@@ -99,21 +99,12 @@ data class MascotNavActions(
 
 @Composable
 fun MascotBottomNav(
-    currentScreen: NavigationItem,
-    isMenuOpen: Boolean = false,
-    dynamicSlotIcon: ImageVector? = null,
-    onMenuClick: () -> Unit,
-    onDynamicSlotClick: () -> Unit,
-    onNavigate: (NavigationItem) -> Unit
+    state: MascotNavState,
+    actions: MascotNavActions
 ) {
-    val navState = MascotNavState(currentScreen, isMenuOpen, dynamicSlotIcon)
-    val navActions = remember(onMenuClick, onDynamicSlotClick, onNavigate) {
-        MascotNavActions(onMenuClick, onDynamicSlotClick, onNavigate)
-    }
-
     MascotNavLayout(
-        state = navState,
-        actions = navActions
+        state = state,
+        actions = actions
     )
 }
 
@@ -188,12 +179,6 @@ private fun rememberMascotAnimation(targetOffsetX: Dp): androidx.compose.animati
                 )
             )
         }
-    }
-    
-    // Optimized Logging
-    val currentVal = animatedOffsetX.value
-    LaunchedEffect(currentVal) {
-        // Keeping log logic minimal or removed for production cleanliness as per refactor
     }
     
     return animatedOffsetX

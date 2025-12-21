@@ -57,6 +57,8 @@ fun FloatingCommandDeck(
     onLogoutClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    androidx.activity.compose.BackHandler(enabled = isVisible, onBack = onDismiss)
+
     val menuItems = listOf(
         CommandItem("Settings", Icons.Filled.Settings, onSettingsClick),
         CommandItem("Profile", Icons.Filled.Person, {}),

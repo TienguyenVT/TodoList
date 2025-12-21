@@ -91,17 +91,10 @@ class ZenTaskAppState(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    fun addTask(
-        title: String,
-        description: String?,
-        dueDate: LocalDate?,
-        priority: Priority,
-        collectionId: Int?,
-        imageUri: String?
-    ) {
+    fun addTask(request: AddTaskRequest) {
         coroutineScope.launch {
             try {
-                val targetCollectionId = collectionId ?: selectedCollection?.id
+                val targetCollectionId = request.collectionId ?: selectedCollection?.id
                 val (validatedGroupId, wasInvalidGroup) = withContext(Dispatchers.IO) {
                     if (targetCollectionId == null) {
                         null to false
@@ -119,18 +112,20 @@ class ZenTaskAppState(
                 withContext(Dispatchers.IO) {
                     taskDao.upsert(
                         DbTask(
-                            title = title,
-                            description = description,
+                            title = request.title,
+                            description = request.description,
                             progressNotes = null,
-                            dueDate = dueDate?.toEpochMillis(),
+                            dueDate = request.dueDate?.toEpochMillis(),
                             urlLink = null,
-                            imagePath = imageUri,
+                            imagePath = request.imageUri,
                             status = 0,
-                            priority = priority.toDbPriority(),
+                            priority = request.priority.toDbPriority(),
                             groupId = validatedGroupId
                         )
                     )
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Add task failed", e)
                 showToast("Lỗi khi thêm công việc")
@@ -150,6 +145,8 @@ class ZenTaskAppState(
                         )
                     )
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Add collection failed", e)
                 showToast("Lỗi khi tạo danh mục")
@@ -160,21 +157,24 @@ class ZenTaskAppState(
     fun toggleTask(id: Int) {
         coroutineScope.launch {
             try {
-                val current = withContext(Dispatchers.IO) { taskDao.getById(id) } ?: return@launch run {
+                val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                if (current == null) {
                     Log.w(TAG, "Toggle task failed: taskId=$id not found")
                     showToast("Không tìm thấy công việc")
-                }
-
-                val newStatus = if (current.status == 1) {
-                    lastNonCompletedStatus.remove(id) ?: 0
                 } else {
-                    lastNonCompletedStatus[id] = current.status
-                    1
-                }
+                    val newStatus = if (current.status == 1) {
+                        lastNonCompletedStatus.remove(id) ?: 0
+                    } else {
+                        lastNonCompletedStatus[id] = current.status
+                        1
+                    }
 
-                withContext(Dispatchers.IO) {
-                    taskDao.update(current.copy(status = newStatus))
+                    withContext(Dispatchers.IO) {
+                        taskDao.update(current.copy(status = newStatus))
+                    }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Toggle task failed: taskId=$id", e)
                 showToast("Lỗi khi cập nhật công việc")
@@ -187,6 +187,8 @@ class ZenTaskAppState(
             try {
                 lastNonCompletedStatus.remove(id)
                 withContext(Dispatchers.IO) { taskDao.deleteById(id) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Delete task failed: taskId=$id", e)
                 showToast("Lỗi khi xoá công việc")
@@ -197,23 +199,26 @@ class ZenTaskAppState(
     fun changeTaskStatus(id: Int, column: KanbanColumn) {
         coroutineScope.launch {
             try {
-                val current = withContext(Dispatchers.IO) { taskDao.getById(id) } ?: return@launch
+                val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                if (current != null) {
+                    val newStatus = when (column) {
+                        KanbanColumn.COMPLETED -> 1
+                        KanbanColumn.IN_PROGRESS -> 2
+                        KanbanColumn.UNCOMPLETED -> 0
+                    }
 
-                val newStatus = when (column) {
-                    KanbanColumn.COMPLETED -> 1
-                    KanbanColumn.IN_PROGRESS -> 2
-                    KanbanColumn.UNCOMPLETED -> 0
-                }
+                    withContext(Dispatchers.IO) {
+                        taskDao.update(current.copy(status = newStatus))
+                    }
 
-                withContext(Dispatchers.IO) {
-                    taskDao.update(current.copy(status = newStatus))
+                    if (newStatus == 1 && current.status != 1) {
+                        lastNonCompletedStatus[id] = current.status
+                    } else if (newStatus != 1) {
+                        lastNonCompletedStatus[id] = newStatus
+                    }
                 }
-
-                if (newStatus == 1 && current.status != 1) {
-                    lastNonCompletedStatus[id] = current.status
-                } else if (newStatus != 1) {
-                    lastNonCompletedStatus[id] = newStatus
-                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Change status failed: taskId=$id", e)
                 showToast("Lỗi khi cập nhật trạng thái")
@@ -221,6 +226,15 @@ class ZenTaskAppState(
         }
     }
 }
+
+data class AddTaskRequest(
+    val title: String,
+    val description: String?,
+    val dueDate: LocalDate?,
+    val priority: Priority,
+    val collectionId: Int?,
+    val imageUri: String?
+)
 
 @Composable
 fun rememberZenTaskAppState(

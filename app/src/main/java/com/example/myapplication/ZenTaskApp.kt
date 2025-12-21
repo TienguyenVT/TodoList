@@ -93,17 +93,20 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
             ZenTaskContent(
-                currentScreen = appState.currentScreen,
-                renderedScreen = appState.renderedScreen,
-                tasks = tasks,
-                collections = collections,
-                collectionNameMap = collectionNameMap,
-                selectedCollection = appState.selectedCollection,
-                onTaskToggle = appState::toggleTask,
-                onTaskDelete = appState::deleteTask,
-                onTaskStatusChange = appState::changeTaskStatus,
-                onCollectionSelected = { appState.selectedCollection = it },
-                onAddCollectionClick = { appState.showAddCollectionSheet = true },
+                uiState = com.example.myapplication.ui.components.ZenTaskUiState(
+                    currentScreen = appState.currentScreen,
+                    renderedScreen = appState.renderedScreen,
+                    tasks = tasks,
+                    collections = collections,
+                    collectionNameMap = collectionNameMap
+                ),
+                callbacks = com.example.myapplication.ui.components.ZenTaskCallbacks(
+                    onTaskToggle = appState::toggleTask,
+                    onTaskDelete = appState::deleteTask,
+                    onTaskStatusChange = appState::changeTaskStatus,
+                    onCollectionSelected = { appState.selectedCollection = it },
+                    onAddCollectionClick = { appState.showAddCollectionSheet = true }
+                ),
                 modifier = Modifier.weight(1f)
             )
 
@@ -117,23 +120,31 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                 )
             ) {
                 MascotBottomNav(
-                    currentScreen = appState.currentScreen,
-                    isMenuOpen = appState.isMenuVisible,
-                    dynamicSlotIcon = appState.dynamicSlotItem?.let { 
-                        when (it) {
-                             NavigationItem.SETTINGS -> Icons.Filled.Settings
-                             else -> null
-                        }
+                    state = androidx.compose.runtime.remember(appState.currentScreen, appState.isMenuVisible, appState.dynamicSlotItem) {
+                        com.example.myapplication.ui.components.MascotNavState(
+                            currentScreen = appState.currentScreen,
+                            isMenuOpen = appState.isMenuVisible,
+                            dynamicSlotIcon = appState.dynamicSlotItem?.let { 
+                                when (it) {
+                                     NavigationItem.SETTINGS -> Icons.Filled.Settings
+                                     else -> null
+                                }
+                            }
+                        )
                     },
-                    onMenuClick = { appState.isMenuVisible = !appState.isMenuVisible },
-                    onDynamicSlotClick = { 
-                        if (appState.dynamicSlotItem != null) {
-                            appState.currentScreen = appState.dynamicSlotItem!!
-                        } else {
-                            appState.isMenuVisible = true
-                        }
-                    },
-                    onNavigate = appState::navigateTo
+                    actions = androidx.compose.runtime.remember(appState) {
+                        com.example.myapplication.ui.components.MascotNavActions(
+                            onMenuClick = { appState.isMenuVisible = !appState.isMenuVisible },
+                            onDynamicSlotClick = { 
+                                if (appState.dynamicSlotItem != null) {
+                                    appState.currentScreen = appState.dynamicSlotItem!!
+                                } else {
+                                    appState.isMenuVisible = true
+                                }
+                            },
+                            onNavigate = appState::navigateTo
+                        )
+                    }
                 )
             }
         }
@@ -187,7 +198,7 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
             ModalBottomSheet({ appState.showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
                 AddTaskSheet(
                     onAddTask = { t, desc, d, p, c, img ->
-                        appState.addTask(t, desc, d, p, c, img)
+                        appState.addTask(com.example.myapplication.ui.state.AddTaskRequest(t, desc, d, p, c, img))
                         appState.showAddTaskSheet = false
                     },
                     onDismiss = { appState.showAddTaskSheet = false }

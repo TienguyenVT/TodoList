@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">My Application</string>
     <string name="tasks_count">%1$d công việc</string>
+    <string name="tasks_completed_format">%1$d/%2$d hoàn thành</string>
     <string name="prev_month">Tháng trước</string>
     <string name="next_month">Tháng sau</string>
     <string name="no_items_today">Không có việc trong ngày này</string>

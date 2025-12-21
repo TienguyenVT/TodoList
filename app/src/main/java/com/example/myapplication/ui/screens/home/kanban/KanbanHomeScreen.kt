@@ -53,7 +53,11 @@ fun KanbanHomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "$completedCount/$totalCount hoàn thành",
+                            text = androidx.compose.ui.res.stringResource(
+                                com.example.myapplication.R.string.tasks_completed_format,
+                                completedCount,
+                                totalCount
+                            ),
                             fontSize = 14.sp,
                             color = NeumorphicColors.textSecondary
                         )

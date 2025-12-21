@@ -19,26 +19,17 @@ import com.example.myapplication.ui.screens.SettingsScreen
 
 @Composable
 fun ZenTaskContent(
-    currentScreen: NavigationItem,
-    renderedScreen: NavigationItem,
-    tasks: List<Task>,
-    collections: List<UiCollection>,
-    collectionNameMap: Map<Int, String>,
-    selectedCollection: UiCollection?,
-    onTaskToggle: (Int) -> Unit,
-    onTaskDelete: (Int) -> Unit,
-    onTaskStatusChange: (Int, KanbanColumn) -> Unit,
-    onCollectionSelected: (UiCollection?) -> Unit,
-    onAddCollectionClick: () -> Unit,
+    uiState: ZenTaskUiState,
+    callbacks: ZenTaskCallbacks,
     modifier: Modifier = Modifier
 ) {
     Box(modifier) {
         // Track if content is still being rendered (during deferred load)
-        val isRendering = currentScreen != renderedScreen
+        val isRendering = uiState.currentScreen != uiState.renderedScreen
 
         // Show skeleton placeholder during transition
         if (isRendering) {
-            when (currentScreen) {
+            when (uiState.currentScreen) {
                 NavigationItem.MY_DAY -> SkeletonKanbanScreen(
                     modifier = Modifier.fillMaxSize()
                 )
@@ -52,32 +43,48 @@ fun ZenTaskContent(
 
         // Sử dụng Crossfade để chuyển đổi màn hình mượt mà hơn, tránh hiện tượng giật cục khi spam tab
         Crossfade(
-            targetState = renderedScreen, // Sử dụng renderedScreen (đã delay) thay vì currentScreen
+            targetState = uiState.renderedScreen, // Sử dụng renderedScreen (đã delay) thay vì currentScreen
             label = "ScreenTransition",
             animationSpec = tween(durationMillis = 300) // Thời gian chuyển cảnh hợp lý
         ) { targetScreen ->
             when (targetScreen) {
                 NavigationItem.MY_DAY -> KanbanHomeScreen(
-                    tasks = tasks,
-                    collections = collectionNameMap,
-                    onTaskToggle = onTaskToggle,
-                    onTaskDelete = onTaskDelete,
-                    onTaskStatusChange = onTaskStatusChange
+                    tasks = uiState.tasks,
+                    collections = uiState.collectionNameMap,
+                    onTaskToggle = callbacks.onTaskToggle,
+                    onTaskDelete = callbacks.onTaskDelete,
+                    onTaskStatusChange = callbacks.onTaskStatusChange
                 )
                 NavigationItem.CALENDAR -> CalendarScreen(
-                    tasks = tasks,
-                    collections = collections,
-                    onTaskToggle = onTaskToggle,
-                    onTaskDelete = onTaskDelete
+                    tasks = uiState.tasks,
+                    collections = uiState.collections,
+                    onTaskToggle = callbacks.onTaskToggle,
+                    onTaskDelete = callbacks.onTaskDelete
                 )
                 NavigationItem.COLLECTIONS -> CollectionsScreen(
-                    collections,
-                    tasks,
-                    onCollectionSelected,
-                    onAddCollectionClick
+                    uiState.collections,
+                    uiState.tasks,
+                    callbacks.onCollectionSelected,
+                    callbacks.onAddCollectionClick
                 )
                 NavigationItem.SETTINGS -> SettingsScreen()
             }
         }
     }
 }
+
+data class ZenTaskUiState(
+    val currentScreen: NavigationItem,
+    val renderedScreen: NavigationItem,
+    val tasks: List<Task>,
+    val collections: List<UiCollection>,
+    val collectionNameMap: Map<Int, String>
+)
+
+data class ZenTaskCallbacks(
+    val onTaskToggle: (Int) -> Unit,
+    val onTaskDelete: (Int) -> Unit,
+    val onTaskStatusChange: (Int, KanbanColumn) -> Unit,
+    val onCollectionSelected: (UiCollection?) -> Unit,
+    val onAddCollectionClick: () -> Unit
+)
