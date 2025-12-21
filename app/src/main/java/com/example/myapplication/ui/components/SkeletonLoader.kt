@@ -19,8 +19,7 @@ import com.example.myapplication.ui.theme.NeumorphicColors
 @Composable
 fun ShimmerEffect(
     modifier: Modifier = Modifier,
-    baseColor: Color = NeumorphicColors.surface,
-    highlightColor: Color = NeumorphicColors.background.copy(alpha = 0.6f)
+    baseColor: Color = NeumorphicColors.surface
 ) {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val alpha by transition.animateFloat(
@@ -65,8 +64,7 @@ fun SkeletonTaskCard(
                 modifier = Modifier
                     .fillMaxWidth(0.7f)
                     .height(16.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                highlightColor = NeumorphicColors.textSecondary.copy(alpha = 0.2f)
+                    .clip(RoundedCornerShape(4.dp))
             )
             
             // Subtitle placeholder
@@ -74,8 +72,7 @@ fun SkeletonTaskCard(
                 modifier = Modifier
                     .fillMaxWidth(0.4f)
                     .height(12.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                highlightColor = NeumorphicColors.textSecondary.copy(alpha = 0.15f)
+                    .clip(RoundedCornerShape(4.dp))
             )
         }
     }

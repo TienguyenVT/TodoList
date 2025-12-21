@@ -21,6 +21,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
+import android.database.SQLException
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 
 private const val TAG = "ZenTaskApp"
 
@@ -57,6 +60,46 @@ class ZenTaskAppState(
 
     // Helper State for non-completed task tracking
     private val lastNonCompletedStatus = mutableStateMapOf<Int, Int>()
+
+    // Computed properties to reduce cognitive complexity in composables
+    val showFab: Boolean get() = currentScreen == NavigationItem.COLLECTIONS && !isMenuVisible
+    val showCommandDeck: Boolean get() = isMenuVisible && chromeVisible
+    val showAddTaskCondition: Boolean get() = showAddTaskSheet && currentScreen == NavigationItem.COLLECTIONS
+
+    // Initialize background jobs
+    init {
+        startMidnightUpdateJob()
+    }
+
+    private fun startMidnightUpdateJob() {
+        coroutineScope.launch {
+            while (true) {
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
+                val waitMillis = java.time.Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1000)
+                delay(waitMillis)
+                currentDate = LocalDate.now()
+            }
+        }
+    }
+
+    fun validateSelectedCollection(collections: List<UiCollection>) {
+        val currentSelectedId = selectedCollection?.id ?: return
+        if (collections.none { it.id == currentSelectedId }) {
+            selectedCollection = null
+        }
+    }
+
+    fun getDynamicSlotIcon(): androidx.compose.ui.graphics.vector.ImageVector? {
+        return when (dynamicSlotItem) {
+            NavigationItem.SETTINGS -> Icons.Filled.Settings
+            else -> null
+        }
+    }
+
+    fun handleDynamicSlotClick() {
+        dynamicSlotItem?.let { currentScreen = it } ?: run { isMenuVisible = true }
+    }
 
     fun navigateTo(item: NavigationItem) {
         PerfLogger.logAction(
@@ -127,7 +170,7 @@ class ZenTaskAppState(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: SQLException) {
                 Log.e(TAG, "Add task failed", e)
                 showToast("Lỗi khi thêm công việc")
             }
@@ -148,7 +191,7 @@ class ZenTaskAppState(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: SQLException) {
                 Log.e(TAG, "Add collection failed", e)
                 showToast("Lỗi khi tạo danh mục")
             }
@@ -176,7 +219,7 @@ class ZenTaskAppState(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: SQLException) {
                 Log.e(TAG, "Toggle task failed: taskId=$id", e)
                 showToast("Lỗi khi cập nhật công việc")
             }
@@ -190,7 +233,7 @@ class ZenTaskAppState(
                 withContext(Dispatchers.IO) { taskDao.deleteById(id) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: SQLException) {
                 Log.e(TAG, "Delete task failed: taskId=$id", e)
                 showToast("Lỗi khi xoá công việc")
             }
@@ -220,7 +263,7 @@ class ZenTaskAppState(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: SQLException) {
                 Log.e(TAG, "Change status failed: taskId=$id", e)
                 showToast("Lỗi khi cập nhật trạng thái")
             }

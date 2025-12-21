@@ -63,17 +63,6 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
         appState.onScreenChange(appState.currentScreen)
     }
 
-    // Effect: Update Current Date at Midnight
-    LaunchedEffect(Unit) {
-        while (true) {
-            val now = LocalDateTime.now()
-            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
-            val waitMillis = java.time.Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1000)
-            delay(waitMillis)
-            appState.currentDate = LocalDate.now()
-        }
-    }
-
     // Effect: Chrome Entrance
     LaunchedEffect(Unit) {
         onAppReady?.invoke()
@@ -83,10 +72,7 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
 
     // Effect: Validate Selected Collection
     LaunchedEffect(collections) {
-        val currentSelectedId = appState.selectedCollection?.id ?: return@LaunchedEffect
-        if (collections.none { it.id == currentSelectedId }) {
-            appState.selectedCollection = null
-        }
+        appState.validateSelectedCollection(collections)
     }
 
     // Render UI
@@ -110,124 +96,131 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                 modifier = Modifier.weight(1f)
             )
 
-            AnimatedVisibility(
-                visible = appState.chromeVisible,
-                enter = slideInVertically(
-                    initialOffsetY = { fullHeight -> fullHeight },
-                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-                ) + fadeIn(
-                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-                )
-            ) {
-                MascotBottomNav(
-                    state = androidx.compose.runtime.remember(appState.currentScreen, appState.isMenuVisible, appState.dynamicSlotItem) {
-                        com.example.myapplication.ui.components.MascotNavState(
-                            currentScreen = appState.currentScreen,
-                            isMenuOpen = appState.isMenuVisible,
-                            dynamicSlotIcon = appState.dynamicSlotItem?.let { 
-                                when (it) {
-                                     NavigationItem.SETTINGS -> Icons.Filled.Settings
-                                     else -> null
-                                }
-                            }
-                        )
-                    },
-                    actions = androidx.compose.runtime.remember(appState) {
-                        com.example.myapplication.ui.components.MascotNavActions(
-                            onMenuClick = { appState.isMenuVisible = !appState.isMenuVisible },
-                            onDynamicSlotClick = { 
-                                if (appState.dynamicSlotItem != null) {
-                                    appState.currentScreen = appState.dynamicSlotItem!!
-                                } else {
-                                    appState.isMenuVisible = true
-                                }
-                            },
-                            onNavigate = appState::navigateTo
-                        )
-                    }
-                )
-            }
+            ZenTaskBottomNav(appState)
         }
 
-        // Floating Command Deck
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 90.dp, end = 24.dp),
-            contentAlignment = Alignment.BottomEnd
-        ) {
-            FloatingCommandDeck(
-                isVisible = appState.isMenuVisible && appState.chromeVisible,
-                onDismiss = { appState.isMenuVisible = false },
-                onSettingsClick = {
-                    appState.onMenuAction {
-                        appState.dynamicSlotItem = NavigationItem.SETTINGS
-                        appState.currentScreen = NavigationItem.SETTINGS
-                    }
-                },
-                onLogoutClick = {
-                    appState.onMenuAction {
-                        appState.showToast("Logout Clicked")
-                    }
+        ZenTaskCommandDeck(appState)
+        ZenTaskFab(appState)
+        ZenTaskSheets(appState)
+        ZenTaskDetailOverlay(appState, tasksBySelectedCollection)
+    }
+}
+
+@Composable
+private fun ZenTaskBottomNav(appState: com.example.myapplication.ui.state.ZenTaskAppState) {
+    AnimatedVisibility(
+        visible = appState.chromeVisible,
+        enter = slideInVertically(
+            initialOffsetY = { fullHeight -> fullHeight },
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        ) + fadeIn(
+            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        )
+    ) {
+        MascotBottomNav(
+            state = com.example.myapplication.ui.components.MascotNavState(
+                currentScreen = appState.currentScreen,
+                isMenuOpen = appState.isMenuVisible,
+                dynamicSlotIcon = appState.getDynamicSlotIcon()
+            ),
+            actions = com.example.myapplication.ui.components.MascotNavActions(
+                onMenuClick = { appState.isMenuVisible = !appState.isMenuVisible },
+                onDynamicSlotClick = appState::handleDynamicSlotClick,
+                onNavigate = appState::navigateTo
+            )
+        )
+    }
+}
+
+@Composable
+private fun ZenTaskCommandDeck(appState: com.example.myapplication.ui.state.ZenTaskAppState) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 90.dp, end = 24.dp),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        FloatingCommandDeck(
+            isVisible = appState.showCommandDeck,
+            onDismiss = { appState.isMenuVisible = false },
+            onSettingsClick = {
+                appState.onMenuAction {
+                    appState.dynamicSlotItem = NavigationItem.SETTINGS
+                    appState.currentScreen = NavigationItem.SETTINGS
                 }
+            },
+            onLogoutClick = {
+                appState.onMenuAction {
+                    appState.showToast("Logout Clicked")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.ZenTaskFab(appState: com.example.myapplication.ui.state.ZenTaskAppState) {
+    if (appState.showFab) {
+        AnimatedVisibility(
+            visible = appState.chromeVisible,
+            enter = slideInVertically(
+                initialOffsetY = { fullHeight -> fullHeight / 2 },
+                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+            ) + fadeIn(
+                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+            )
+        ) {
+            NeumorphicFAB(
+                onClick = { appState.showAddTaskSheet = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 24.dp, bottom = 90.dp)
             )
         }
+    }
+}
 
-        // FAB
-        if (appState.currentScreen == NavigationItem.COLLECTIONS && !appState.isMenuVisible) {
-            AnimatedVisibility(
-                visible = appState.chromeVisible,
-                enter = slideInVertically(
-                    initialOffsetY = { fullHeight -> fullHeight / 2 },
-                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-                ) + fadeIn(
-                    animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-                )
-            ) {
-                NeumorphicFAB(
-                    onClick = { appState.showAddTaskSheet = true },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 24.dp, bottom = 90.dp)
-                )
-            }
-        }
-
-        // Sheets
-        if (appState.showAddTaskSheet && appState.currentScreen == NavigationItem.COLLECTIONS) {
-            ModalBottomSheet({ appState.showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
-                AddTaskSheet(
-                    onAddTask = { t, desc, d, p, c, img ->
-                        appState.addTask(com.example.myapplication.ui.state.AddTaskRequest(t, desc, d, p, c, img))
-                        appState.showAddTaskSheet = false
-                    },
-                    onDismiss = { appState.showAddTaskSheet = false }
-                )
-            }
-        }
-
-        if (appState.showAddCollectionSheet) {
-            ModalBottomSheet({ appState.showAddCollectionSheet = false }, containerColor = NeumorphicColors.surface) {
-                AddCollectionSheet(
-                    onAddCollection = { n, c ->
-                        appState.addCollection(n, c)
-                        appState.showAddCollectionSheet = false
-                    },
-                    onDismiss = { appState.showAddCollectionSheet = false }
-                )
-            }
-        }
-
-        // Detail View
-        appState.selectedCollection?.let { collection ->
-            CollectionDetailView(
-                collection,
-                tasksBySelectedCollection,
-                { appState.selectedCollection = null },
-                appState::toggleTask,
-                appState::deleteTask
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ZenTaskSheets(appState: com.example.myapplication.ui.state.ZenTaskAppState) {
+    if (appState.showAddTaskCondition) {
+        ModalBottomSheet({ appState.showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
+            AddTaskSheet(
+                onAddTask = { t, desc, d, p, c, img ->
+                    appState.addTask(com.example.myapplication.ui.state.AddTaskRequest(t, desc, d, p, c, img))
+                    appState.showAddTaskSheet = false
+                },
+                onDismiss = { appState.showAddTaskSheet = false }
             )
         }
+    }
+
+    if (appState.showAddCollectionSheet) {
+        ModalBottomSheet({ appState.showAddCollectionSheet = false }, containerColor = NeumorphicColors.surface) {
+            AddCollectionSheet(
+                onAddCollection = { n, c ->
+                    appState.addCollection(n, c)
+                    appState.showAddCollectionSheet = false
+                },
+                onDismiss = { appState.showAddCollectionSheet = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ZenTaskDetailOverlay(
+    appState: com.example.myapplication.ui.state.ZenTaskAppState,
+    tasksBySelectedCollection: List<Task>
+) {
+    appState.selectedCollection?.let { collection ->
+        CollectionDetailView(
+            collection,
+            tasksBySelectedCollection,
+            { appState.selectedCollection = null },
+            appState::toggleTask,
+            appState::deleteTask
+        )
     }
 }
 

@@ -281,7 +281,6 @@ private fun MascotOverlay(
                 ) 
             }
             .graphicsLayer {
-                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                 scaleX = if (facingRight) 1f else -1f
             },
         contentAlignment = Alignment.Center
