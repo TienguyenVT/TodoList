@@ -56,33 +56,17 @@ fun AddTaskSheet(
     var imageUri by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
-
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri ->
-            imageUri = uri?.toString()
-        }
+        onResult = { uri -> imageUri = uri?.toString() }
     )
 
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     val takePictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
-        onResult = { success ->
-            if (success) {
-                imageUri = pendingCameraUri?.toString()
-            }
-        }
+        onResult = { success -> if (success) imageUri = pendingCameraUri?.toString() }
     )
-
-    fun createTempImageUri(appContext: Context): Uri {
-        val imagesDir = File(appContext.cacheDir, "images").apply { mkdirs() }
-        val imageFile = File(imagesDir, "task_${System.currentTimeMillis()}.jpg")
-        return FileProvider.getUriForFile(
-            appContext,
-            "${appContext.packageName}.fileprovider",
-            imageFile
-        )
-    }
 
     fun launchCameraCapture() {
         val uri = createTempImageUri(context.applicationContext)
@@ -96,16 +80,7 @@ fun AddTaskSheet(
             if (granted) {
                 launchCameraCapture()
             } else {
-                val activity = context as? Activity
-                val shouldShowRationale = activity?.let {
-                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
-                } ?: false
-                val message = if (shouldShowRationale) {
-                    "Cần quyền Camera để chụp ảnh. Vui lòng cấp quyền để tiếp tục."
-                } else {
-                    "Bạn đã từ chối quyền Camera. Hãy bật quyền trong Cài đặt nếu muốn chụp ảnh."
-                }
-                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                showCameraPermissionRationale(context)
             }
         }
     )
@@ -118,138 +93,158 @@ fun AddTaskSheet(
         NeumorphicTextField(value = description, onValueChange = { description = it }, placeholder = "Mô tả công việc (tuỳ chọn)")
 
         Spacer(Modifier.height(16.dp))
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    val now = dueDate ?: LocalDate.now()
-                    DatePickerDialog(
-                        context,
-                        { _, year, month, dayOfMonth ->
-                            dueDate = LocalDate.of(year, month + 1, dayOfMonth)
-                        },
-                        now.year,
-                        now.monthValue - 1,
-                        now.dayOfMonth
-                    ).show()
-                },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(NeumorphicColors.darkShadow.copy(0.05f))
-                    .padding(16.dp)
-            ) {
-                val text = dueDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: "Chọn ngày đến hạn"
-                Text(text, color = NeumorphicColors.textPrimary, fontSize = 16.sp)
-            }
-        }
+        TaskDatePickerCard(dueDate, context) { dueDate = it }
 
         Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Priority.entries.forEach { p ->
-                val isSelected = priority == p
-                Card(
-                    modifier = Modifier.clickable { priority = p }.padding(horizontal = 4.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.darkShadow.copy(0.15f) else NeumorphicColors.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
-                ) {
-                    Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                        Text(p.name, color = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                    }
-                }
-            }
-        }
+        TaskPrioritySelector(priority) { priority = it }
 
         Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        pickImageLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Image, contentDescription = "Chọn ảnh", tint = NeumorphicColors.textPrimary)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Chọn ảnh", color = NeumorphicColors.textPrimary)
+        TaskImagePickerButtons(
+            onPickImage = {
+                pickImageLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onCaptureImage = {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    launchCameraCapture()
+                } else {
+                    requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 }
             }
+        )
 
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable {
-                        val granted = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.CAMERA
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (granted) {
-                            launchCameraCapture()
-                        } else {
-                            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    },
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = "Chụp ảnh", tint = NeumorphicColors.textPrimary)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Chụp ảnh", color = NeumorphicColors.textPrimary)
-                }
-            }
-        }
-
-        imageUri?.let { uriString ->
-            Spacer(Modifier.height(16.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                AsyncImage(
-                    model = Uri.parse(uriString),
-                    contentDescription = "Ảnh công việc",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                )
-            }
-        }
+        TaskImagePreview(imageUri)
 
         Spacer(Modifier.height(32.dp))
         NeumorphicButton("Lưu công việc") {
             if (title.isNotBlank()) {
-                onAddTask(
-                    title,
-                    description.takeIf { it.isNotBlank() },
-                    dueDate,
-                    priority,
-                    null,
-                    imageUri
-                )
+                onAddTask(title, description.takeIf { it.isNotBlank() }, dueDate, priority, null, imageUri)
             }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+private fun createTempImageUri(appContext: Context): Uri {
+    val imagesDir = File(appContext.cacheDir, "images").apply { mkdirs() }
+    val imageFile = File(imagesDir, "task_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", imageFile)
+}
+
+private fun showCameraPermissionRationale(context: Context) {
+    val activity = context as? Activity
+    val shouldShowRationale = activity?.let {
+        ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+    } ?: false
+    val message = if (shouldShowRationale) {
+        "Cần quyền Camera để chụp ảnh. Vui lòng cấp quyền để tiếp tục."
+    } else {
+        "Bạn đã từ chối quyền Camera. Hãy bật quyền trong Cài đặt nếu muốn chụp ảnh."
+    }
+    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+}
+
+@Composable
+fun TaskDatePickerCard(dueDate: LocalDate?, context: Context, onDateSelected: (LocalDate) -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                val now = dueDate ?: LocalDate.now()
+                DatePickerDialog(
+                    context,
+                    { _, year, month, dayOfMonth -> onDateSelected(LocalDate.of(year, month + 1, dayOfMonth)) },
+                    now.year, now.monthValue - 1, now.dayOfMonth
+                ).show()
+            },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(NeumorphicColors.darkShadow.copy(0.05f))
+                .padding(16.dp)
+        ) {
+            val text = dueDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: "Chọn ngày đến hạn"
+            Text(text, color = NeumorphicColors.textPrimary, fontSize = 16.sp)
+        }
+    }
+}
+
+@Composable
+fun TaskPrioritySelector(selectedPriority: Priority, onSelect: (Priority) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Priority.entries.forEach { p ->
+            val isSelected = selectedPriority == p
+            Card(
+                modifier = Modifier.clickable { onSelect(p) }.padding(horizontal = 4.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.darkShadow.copy(0.15f) else NeumorphicColors.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 6.dp)
+            ) {
+                Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                    Text(p.name, color = if (isSelected) NeumorphicColors.textPrimary else NeumorphicColors.textSecondary, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskImagePickerButtons(onPickImage: () -> Unit, onCaptureImage: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Card(
+            modifier = Modifier.weight(1f).clickable { onPickImage() },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Image, contentDescription = "Chọn ảnh", tint = NeumorphicColors.textPrimary)
+                Spacer(Modifier.width(8.dp))
+                Text("Chọn ảnh", color = NeumorphicColors.textPrimary)
+            }
+        }
+
+        Card(
+            modifier = Modifier.weight(1f).clickable { onCaptureImage() },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CameraAlt, contentDescription = "Chụp ảnh", tint = NeumorphicColors.textPrimary)
+                Spacer(Modifier.width(8.dp))
+                Text("Chụp ảnh", color = NeumorphicColors.textPrimary)
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskImagePreview(imageUri: String?) {
+    imageUri?.let { uriString ->
+        Spacer(Modifier.height(16.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            AsyncImage(
+                model = Uri.parse(uriString),
+                contentDescription = "Ảnh công việc",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            )
+        }
     }
 }
 

@@ -105,26 +105,40 @@ object LunarUtils {
     }
 
     fun convertSolar2Lunar(date: LocalDate, timeZone: Double = 7.0): LunarDate {
-        val day = date.dayOfMonth
-        val month = date.monthValue
-        val year = date.year
-        val dayNumber = jdFromDate(day, month, year)
+        val dayNumber = jdFromDate(date.dayOfMonth, date.monthValue, date.year)
         val k = floor((dayNumber - 2415021.076998695) / 29.530588853).toInt()
+        
         var monthStart = getNewMoonDay(k + 1, timeZone)
         if (monthStart > dayNumber) monthStart = getNewMoonDay(k, timeZone)
+        
+        val lunarYearData = getLunarYearAndMonths(date.year, monthStart, timeZone)
+        val a11 = lunarYearData.first
+        val b11 = lunarYearData.second
+        val lunarYear = lunarYearData.third
+
+        val monthData = calculateLunarMonth(dayNumber, monthStart, a11, b11, timeZone)
+        
+        return LunarDate(
+            day = dayNumber - monthStart + 1,
+            month = monthData.first,
+            year = lunarYear - if (monthData.first >= 11 && (monthNumber(monthStart, a11) < 4)) 1 else 0,
+            isLeap = monthData.second
+        )
+    }
+
+    private fun monthNumber(monthStart: Int, a11: Int): Int = floor((monthStart - a11) / 29.0).toInt()
+
+    private fun getLunarYearAndMonths(year: Int, monthStart: Int, timeZone: Double): Triple<Int, Int, Int> {
         var a11 = getLunarMonth11(year, timeZone)
-        var b11 = a11
-        var lunarYear = year
-        if (a11 >= monthStart) {
-            // monthStart is in the previous lunar year
-            a11 = getLunarMonth11(year - 1, timeZone)
-        } else {
-            // monthStart belongs to the next lunar-year boundary
-            b11 = getLunarMonth11(year + 1, timeZone)
-        }
+        if (a11 >= monthStart) return Triple(getLunarMonth11(year - 1, timeZone), a11, year)
+        return Triple(a11, getLunarMonth11(year + 1, timeZone), year)
+    }
+
+    private fun calculateLunarMonth(dayNumber: Int, monthStart: Int, a11: Int, b11: Int, timeZone: Double): Pair<Int, Boolean> {
         val diff = floor((monthStart - a11) / 29.0).toInt()
         var lunarMonth = diff + 11
         var isLeap = false
+        
         if (b11 - a11 > 365) {
             val leapMonthDiff = getLeapMonthOffset(a11, timeZone)
             if (diff >= leapMonthDiff) {
@@ -133,27 +147,32 @@ object LunarUtils {
             }
         }
         if (lunarMonth > 12) lunarMonth -= 12
-        if (lunarMonth >= 11 && diff < 4) lunarYear -= 1
-        val lunarDay = dayNumber - monthStart + 1
-        return LunarDate(lunarDay, lunarMonth, lunarYear, isLeap)
+        return Pair(lunarMonth, isLeap)
     }
 
-    // Convert lunar date to solar — used for round-trip tests and verification
     fun convertLunar2Solar(lDay: Int, lMonth: Int, lYear: Int, isLeap: Boolean = false, timeZone: Double = 7.0): LocalDate {
         val a11 = getLunarMonth11(lYear - if (lMonth > 11) 1 else 0, timeZone)
         val b11 = getLunarMonth11(lYear + 1, timeZone)
         val k = floor(0.5 + (a11 - 2415021.076998695) / 29.530588853).toInt()
+        
+        val off = calculateSolarOffset(lMonth, isLeap, a11, b11, timeZone)
+        val monthStart = getNewMoonDay(k + off, timeZone)
+        val jd = monthStart + lDay - 1
+        
+        return jdToDate(jd)
+    }
+
+    private fun calculateSolarOffset(lMonth: Int, isLeap: Boolean, a11: Int, b11: Int, timeZone: Double): Int {
         var off = lMonth - 11
         if (off < 0) off += 12
         if (b11 - a11 > 365) {
             val leapOff = getLeapMonthOffset(a11, timeZone)
-            if (!isLeap) {
-                if (off >= leapOff) off += 1
-            }
+            if (!isLeap && off >= leapOff) off += 1
         }
-        val monthStart = getNewMoonDay(k + off, timeZone)
-        val jd = monthStart + lDay - 1
-        // convert jd to date
+        return off
+    }
+
+    private fun jdToDate(jd: Int): LocalDate {
         var Z = jd
         var A = Z
         if (Z >= 2299161) {
@@ -165,8 +184,8 @@ object LunarUtils {
         val D = (365.25 * C).toInt()
         val E = ((B - D) / 30.6001).toInt()
         val day = B - D - (30.6001 * E).toInt()
-        var month = if (E < 14) E - 1 else E - 13
-        var year = if (month > 2) C - 4716 else C - 4715
+        val month = if (E < 14) E - 1 else E - 13
+        val year = if (month > 2) C - 4716 else C - 4715
         return LocalDate.of(year, month, day)
     }
 
