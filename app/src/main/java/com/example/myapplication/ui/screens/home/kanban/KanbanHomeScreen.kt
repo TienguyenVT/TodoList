@@ -41,7 +41,7 @@ fun KanbanHomeScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "$completedCount/$totalCount hoàn thành",
+                            text = stringResource(R.string.tasks_completed_format, completedCount, totalCount),
                             fontSize = 14.sp,
                             color = NeumorphicColors.textSecondary
                         )

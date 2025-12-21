@@ -223,7 +223,7 @@ private fun MascotTabRow(
                 if (state.dynamicSlotIcon != null) {
                     NavItem(icon = state.dynamicSlotIcon, isSelected = isDynamicSelected, onClick = actions.onDynamicSlotClick)
                 } else {
-                    Box(modifier = Modifier.size(48.dp).clickable { actions.onDynamicSlotClick() }, contentAlignment = Alignment.Center) {}
+                    NavItem(icon = Icons.Filled.Add, isSelected = false, onClick = actions.onDynamicSlotClick)
                 }
             }
 

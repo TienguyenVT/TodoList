@@ -378,7 +378,7 @@ private fun KanbanColumnHeader(column: KanbanColumn, count: Int) {
             color = NeumorphicColors.textPrimary
         )
         Text(
-            text = "$count công việc",
+            text = stringResource(R.string.task_count_format, count),
             fontSize = 12.sp,
             color = NeumorphicColors.textSecondary
         )

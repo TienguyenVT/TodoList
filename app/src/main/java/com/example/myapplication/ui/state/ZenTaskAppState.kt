@@ -67,14 +67,15 @@ class ZenTaskAppState(
         isMenuVisible = false
         currentScreen = item
     }
-
+    private var screenChangeJob: kotlinx.coroutines.Job? = null
     fun onScreenChange(item: NavigationItem) {
         if (item != NavigationItem.COLLECTIONS) {
             showAddTaskSheet = false
         }
         Log.d(TAG, "Screen changed to: $item. Waiting for debounce...")
-        
-        coroutineScope.launch {
+
+        screenChangeJob?.cancel()
+        screenChangeJob = coroutineScope.launch {
             // Deferred Rendering logic
             delay(350)
             renderedScreen = item

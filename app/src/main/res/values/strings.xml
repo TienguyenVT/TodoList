@@ -13,6 +13,7 @@
     <string name="cd_done">Hoàn thành</string>
     <string name="cd_delete">Xoá</string>
     <string name="cd_drag">Kéo</string>
+    <string name="task_count_format">%d công việc</string>
     <string-array name="weekday_short">
         <item>T2</item>
         <item>T3</item>
