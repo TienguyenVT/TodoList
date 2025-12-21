@@ -20,12 +20,10 @@ fun ZenTaskAppState.addTask(request: AddTaskRequest) {
         try {
             val targetCollectionId = request.collectionId ?: selectedCollection?.id
             val (validatedGroupId, wasInvalidGroup) = withContext(Dispatchers.IO) {
-                if (targetCollectionId == null) {
-                    null to false
-                } else {
-                    val exists = taskGroupDao.getById(targetCollectionId) != null
-                    if (exists) targetCollectionId to false else null to true
-                }
+                targetCollectionId?.let { id ->
+                    val exists = taskGroupDao.getById(id) != null
+                    if (exists) id to false else null to true
+                } ?: (null to false)
             }
 
             if (wasInvalidGroup) {
