@@ -242,7 +242,7 @@ private fun TaskListSection(
                         )
                     }
 
-                    if (index != combinedItems.lastIndex) {
+                    if (index != limitedItems.lastIndex) {
                         HorizontalDivider(
                             color = NeumorphicColors.background.copy(alpha = 0.12f),
                             thickness = 0.5.dp

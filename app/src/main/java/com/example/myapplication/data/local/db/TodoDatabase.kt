@@ -9,9 +9,6 @@ import com.example.myapplication.data.local.db.dao.TaskDao
 import com.example.myapplication.data.local.db.dao.TaskGroupDao
 import com.example.myapplication.data.local.db.entity.Task
 import com.example.myapplication.data.local.db.entity.TaskGroup
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @Database(
     entities = [

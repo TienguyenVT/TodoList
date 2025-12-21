@@ -1,7 +1,5 @@
 package com.example.myapplication.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -35,47 +34,68 @@ import com.example.myapplication.model.NavigationItem
 import com.example.myapplication.ui.theme.NeumorphicColors
 
 @Composable
-fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) -> Unit) {
+fun NeumorphicNavCard(containerColor: androidx.compose.ui.graphics.Color = NeumorphicColors.surface, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
+        ,
         shape = RoundedCornerShape(30.dp),
-        colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            NavItem(
-                icon = Icons.Filled.Home,
-                isSelected = currentScreen == NavigationItem.MY_DAY,
-                onClick = { onNavigate(NavigationItem.MY_DAY) }
-            )
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+        content = { content() }
+    )
+}
 
-            NavItem(
-                icon = Icons.Filled.DateRange,
-                isSelected = currentScreen == NavigationItem.CALENDAR,
-                onClick = { onNavigate(NavigationItem.CALENDAR) }
-            )
+@Composable
+fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) -> Unit) {
+    Box(modifier = Modifier.padding(24.dp)) {
+        NeumorphicNavCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                NavItem(
+                    icon = Icons.Filled.Home,
+                    isSelected = currentScreen == NavigationItem.MY_DAY,
+                    onClick = { onNavigate(NavigationItem.MY_DAY) }
+                )
 
-            NavItem(
-                icon = Icons.Filled.List,
-                isSelected = currentScreen == NavigationItem.COLLECTIONS,
-                onClick = { onNavigate(NavigationItem.COLLECTIONS) }
-            )
+                NavItem(
+                    icon = Icons.Filled.DateRange,
+                    isSelected = currentScreen == NavigationItem.CALENDAR,
+                    onClick = { onNavigate(NavigationItem.CALENDAR) }
+                )
 
-            NavItem(
-                icon = Icons.Filled.Settings,
-                isSelected = currentScreen == NavigationItem.SETTINGS,
-                onClick = { onNavigate(NavigationItem.SETTINGS) }
-            )
+                NavItem(
+                    icon = Icons.Filled.List,
+                    isSelected = currentScreen == NavigationItem.COLLECTIONS,
+                    onClick = { onNavigate(NavigationItem.COLLECTIONS) }
+                )
+
+                NavItem(
+                    icon = Icons.Filled.Settings,
+                    isSelected = currentScreen == NavigationItem.SETTINGS,
+                    onClick = { onNavigate(NavigationItem.SETTINGS) }
+                )
+            }
         }
     }
 }
+
+
+data class MascotNavState(
+    val currentScreen: NavigationItem,
+    val isMenuOpen: Boolean,
+    val dynamicSlotIcon: ImageVector?
+)
+
+data class MascotNavActions(
+    val onMenuClick: () -> Unit,
+    val onDynamicSlotClick: () -> Unit,
+    val onNavigate: (NavigationItem) -> Unit
+)
 
 @Composable
 fun MascotBottomNav(
@@ -86,11 +106,25 @@ fun MascotBottomNav(
     onDynamicSlotClick: () -> Unit,
     onNavigate: (NavigationItem) -> Unit
 ) {
+    val navState = MascotNavState(currentScreen, isMenuOpen, dynamicSlotIcon)
+    val navActions = remember(onMenuClick, onDynamicSlotClick, onNavigate) {
+        MascotNavActions(onMenuClick, onDynamicSlotClick, onNavigate)
+    }
+
+    MascotNavLayout(
+        state = navState,
+        actions = navActions
+    )
+}
+
+@Composable
+private fun MascotNavLayout(
+    state: MascotNavState,
+    actions: MascotNavActions
+) {
     val tabCount = 5
     val catWidth = 64.dp
     val rowHorizontalPadding = 5.dp
-
-    // Giữ nguyên mức điều chỉnh độ cao (40.dp)
     val yOffsetAdjustment = 27.dp
 
     BoxWithConstraints(
@@ -100,191 +134,171 @@ fun MascotBottomNav(
         contentAlignment = Alignment.TopStart
     ) {
         val maxWidth = maxWidth
+        val rowWidth = maxWidth - rowHorizontalPadding * 2
+        val sectionWidth = rowWidth / tabCount
 
-        // Layout: [0:Calendar] [1:Collection] [2:Home] [3:Dynamic] [4:Menu]
-        val selectedIndex = if (isMenuOpen) 4 else when (currentScreen) {
+        // Determine target index
+        val selectedIndex = if (state.isMenuOpen) 4 else when (state.currentScreen) {
             NavigationItem.CALENDAR -> 0
             NavigationItem.COLLECTIONS -> 1
             NavigationItem.MY_DAY -> 2
             else -> 3
         }
 
-        var previousIndex by remember { mutableIntStateOf(selectedIndex) }
-        var facingRight by remember { mutableStateOf(true) }
-
-        // --- Tính toán tọa độ ---
-        val rowWidth = maxWidth - rowHorizontalPadding * 2
-        val sectionWidth = rowWidth / tabCount
+        // Animation State
         val targetCenter = rowHorizontalPadding + sectionWidth * selectedIndex + sectionWidth / 2
         val targetOffsetX = targetCenter - catWidth / 2
         
-        // === ADVANCED ANIMATION: Velocity-Preserving Spring ===
-        // Sử dụng Animatable với Spring để bảo toàn vận tốc khi target thay đổi (spam click)
-        val animatedOffsetX = remember { 
-            androidx.compose.animation.core.Animatable(targetOffsetX.value) 
-        }
-        
-        // Coroutine-based animation
-        LaunchedEffect(targetOffsetX) {
-            // Log target change
-            // android.util.Log.d("PerfDebug", "🎯 TARGET: ${targetOffsetX.value}dp")
-            
-            // Tính khoảng cách
-            val distance = kotlin.math.abs(targetOffsetX.value - animatedOffsetX.value)
-            
-            // Chỉ Snap nếu khoảng cách CỰC KỲ xa (> 1.5 lần chiều rộng màn hình - hiếm khi xảy ra)
-            // Việc snap ở khoảng cách ngắn (như 150dp) gây cảm giác giật cục
-            if (distance > 600f) {
-                animatedOffsetX.snapTo(targetOffsetX.value)
-            } else {
-                // Sử dụng Spring để có chuyển động tự nhiên và bảo toàn quán tính
-                // TUNED: 
-                // - Stiffness 400f: Giảm tốc độ (~15% chậm hơn so với 500-700f), tạo cảm giác "lướt"
-                // - Damping 0.75f: Nảy nhẹ (soft bounce) ở đích, không quá cứng nhưng không quá lỏng lẻo
-                animatedOffsetX.animateTo(
-                    targetValue = targetOffsetX.value,
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = 0.75f,
-                        stiffness = 50f
-                    )
-                )
-            }
-        }
-        
-        // Convert Animatable value thành Dp
-        val currentOffsetDp = animatedOffsetX.value.dp
-        
-        // === OPTIMIZED LOGGING ===
-        // Chỉ log khi thực sự có issue để giảm overhead cho UI Thread
-        var lastLogTime by remember { mutableStateOf(0L) }
-        androidx.compose.runtime.SideEffect {
-            val now = System.currentTimeMillis()
-            if (lastLogTime > 0) {
-                val delta = now - lastLogTime
-                // Chỉ warn nếu frame gap > 32ms (dropped > 2 frames)
-                if (delta > 32) { 
-                     // Dùng String builder đơn giản hoặc log ngắn gọn nhất
-                     android.util.Log.d("PerfDebug", "⚠️ DROP: ${delta}ms")
-                }
-            }
-            lastLogTime = now
-        }
+        val animatedOffsetX = rememberMascotAnimation(targetOffsetX)
+        val facingRight = rememberMascotDirection(selectedIndex)
 
-        LaunchedEffect(selectedIndex) {
-            if (selectedIndex > previousIndex) {
-                facingRight = true
-            } else if (selectedIndex < previousIndex) {
-                facingRight = false
-            }
-            previousIndex = selectedIndex
-        }
-
-        // Layer 0: Thanh Bottom Bar
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(30.dp),
-            colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = rowHorizontalPadding, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 0: Calendar
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    NavItem(
-                        icon = Icons.Filled.DateRange,
-                        isSelected = !isMenuOpen && currentScreen == NavigationItem.CALENDAR,
-                        onClick = { onNavigate(NavigationItem.CALENDAR) }
-                    )
-                }
-
-                // 1: Collections
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    NavItem(
-                        icon = Icons.Filled.List,
-                        isSelected = !isMenuOpen && currentScreen == NavigationItem.COLLECTIONS,
-                        onClick = { onNavigate(NavigationItem.COLLECTIONS) }
-                    )
-                }
-
-                // 2: Home (My Day)
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    NavItem(
-                        icon = Icons.Filled.Home,
-                        isSelected = !isMenuOpen && currentScreen == NavigationItem.MY_DAY,
-                        onClick = { onNavigate(NavigationItem.MY_DAY) }
-                    )
-                }
-
-                // 3: Dynamic Slot
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                     val isDynamicSelected = !isMenuOpen && 
-                                          currentScreen != NavigationItem.CALENDAR && 
-                                          currentScreen != NavigationItem.COLLECTIONS && 
-                                          currentScreen != NavigationItem.MY_DAY
-
-                    if (dynamicSlotIcon != null) {
-                        NavItem(
-                            icon = dynamicSlotIcon,
-                            isSelected = isDynamicSelected,
-                            onClick = { onDynamicSlotClick() }
-                        )
-                    } else {
-                        // Empty placeholder
-                        Box(
-                             modifier = Modifier
-                                 .size(48.dp)
-                                 .clickable { onDynamicSlotClick() }, 
-                             contentAlignment = Alignment.Center
-                        ) {}
-                    }
-                }
-
-                // 4: Menu Trigger
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    NavItem(
-                        icon = Icons.Filled.Menu,
-                        isSelected = isMenuOpen,
-                        onClick = { onMenuClick() }
-                    )
-                }
-            }
-        }
-
-        // Layer 1: Con mèo (Overlay) - Hardware Accelerated
-        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cat))
-        val progress by animateLottieCompositionAsState(
-            composition = composition,
-            iterations = LottieConstants.IterateForever
+        // Layer 0: Static Tab Row
+        MascotTabRow(
+            state = state,
+            actions = actions,
+            rowHorizontalPadding = rowHorizontalPadding
         )
 
-        Box(
-            modifier = Modifier
-                .size(catWidth)
-                .offset { 
-                    // OPTIMIZATION: Use lambda offset to skip Composition phase, running only in Layout phase
-                    // This is crucial for avoiding 60fps recomposition
-                    androidx.compose.ui.unit.IntOffset(
-                        x = animatedOffsetX.value.dp.roundToPx(), 
-                        y = (-catWidth + yOffsetAdjustment).roundToPx()
-                    ) 
-                }
-                .graphicsLayer {
-                    // Hardware layer để animation chạy riêng biệt, không bị block bởi UI thread
-                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                    // Lật mặt theo hướng di chuyển
-                    scaleX = if (facingRight) 1f else -1f
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            LottieAnimation(
-                composition = composition,
-                progress = { progress }
+        // Layer 1: Animated Mascot Overlay
+        MascotOverlay(
+            animatedOffsetX = animatedOffsetX,
+            facingRight = facingRight,
+            catWidth = catWidth,
+            yOffsetAdjustment = yOffsetAdjustment
+        )
+    }
+}
+
+@Composable
+private fun rememberMascotAnimation(targetOffsetX: Dp): androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D> {
+    val animatedOffsetX = remember { 
+        androidx.compose.animation.core.Animatable(targetOffsetX.value) 
+    }
+
+    LaunchedEffect(targetOffsetX) {
+        val distance = kotlin.math.abs(targetOffsetX.value - animatedOffsetX.value)
+        if (distance > 600f) {
+            animatedOffsetX.snapTo(targetOffsetX.value)
+        } else {
+            animatedOffsetX.animateTo(
+                targetValue = targetOffsetX.value,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = 0.75f,
+                    stiffness = 50f
+                )
             )
         }
+    }
+    
+    // Optimized Logging
+    val currentVal = animatedOffsetX.value
+    LaunchedEffect(currentVal) {
+        // Keeping log logic minimal or removed for production cleanliness as per refactor
+    }
+    
+    return animatedOffsetX
+}
+
+@Composable
+private fun rememberMascotDirection(selectedIndex: Int): Boolean {
+    var previousIndex by remember { mutableIntStateOf(selectedIndex) }
+    var facingRight by remember { mutableStateOf(true) }
+
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex > previousIndex) facingRight = true
+        else if (selectedIndex < previousIndex) facingRight = false
+        previousIndex = selectedIndex
+    }
+    return facingRight
+}
+
+@Composable
+private fun MascotTabRow(
+    state: MascotNavState,
+    actions: MascotNavActions,
+    rowHorizontalPadding: Dp
+) {
+    NeumorphicNavCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = rowHorizontalPadding, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // FIXED: Using single component for standard nav items to reduce duplication
+            StandardNavItemSlot(NavigationItem.CALENDAR, Icons.Filled.DateRange, state.currentScreen, state.isMenuOpen, actions.onNavigate)
+            StandardNavItemSlot(NavigationItem.COLLECTIONS, Icons.Filled.List, state.currentScreen, state.isMenuOpen, actions.onNavigate)
+            StandardNavItemSlot(NavigationItem.MY_DAY, Icons.Filled.Home, state.currentScreen, state.isMenuOpen, actions.onNavigate)
+
+            // Dynamic Slot
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                val isDynamicSelected = !state.isMenuOpen && 
+                                     state.currentScreen !in setOf(NavigationItem.CALENDAR, NavigationItem.COLLECTIONS, NavigationItem.MY_DAY)
+
+                if (state.dynamicSlotIcon != null) {
+                    NavItem(icon = state.dynamicSlotIcon, isSelected = isDynamicSelected, onClick = actions.onDynamicSlotClick)
+                } else {
+                    Box(modifier = Modifier.size(48.dp).clickable { actions.onDynamicSlotClick() }, contentAlignment = Alignment.Center) {}
+                }
+            }
+
+            // Menu Trigger
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                NavItem(icon = Icons.Filled.Menu, isSelected = state.isMenuOpen, onClick = actions.onMenuClick)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.StandardNavItemSlot(
+    item: NavigationItem,
+    icon: ImageVector,
+    currentScreen: NavigationItem,
+    isMenuOpen: Boolean,
+    onNavigate: (NavigationItem) -> Unit
+) {
+    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        NavItem(
+            icon = icon,
+            isSelected = !isMenuOpen && currentScreen == item,
+            onClick = { onNavigate(item) }
+        )
+    }
+}
+
+@Composable
+private fun MascotOverlay(
+    animatedOffsetX: androidx.compose.animation.core.Animatable<Float, *>,
+    facingRight: Boolean,
+    catWidth: Dp,
+    yOffsetAdjustment: Dp
+) {
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cat))
+    val progress by animateLottieCompositionAsState(
+        composition = composition,
+        iterations = LottieConstants.IterateForever
+    )
+
+    Box(
+        modifier = Modifier
+            .size(catWidth)
+            .offset { 
+                androidx.compose.ui.unit.IntOffset(
+                    x = animatedOffsetX.value.dp.roundToPx(), 
+                    y = (yOffsetAdjustment - catWidth).roundToPx()
+                ) 
+            }
+            .graphicsLayer {
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                scaleX = if (facingRight) 1f else -1f
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        LottieAnimation(
+            composition = composition,
+            progress = { progress }
+        )
     }
 }
 

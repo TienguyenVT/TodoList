@@ -3,12 +3,8 @@ package com.example.myapplication.ui.screens.home.kanban
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -60,6 +56,18 @@ private data class DragInfo(
     val anchorInItem: Offset
 )
 
+data class TaskActions(
+    val onToggle: (Int) -> Unit,
+    val onDelete: (Int) -> Unit,
+    val onStatusChange: ((Int, KanbanColumn) -> Unit)? = null
+)
+
+data class DragActions(
+    val onStart: (KanbanTask, Offset, Offset) -> Unit,
+    val onDrag: (Offset) -> Unit,
+    val onEnd: () -> Unit
+)
+
 @Composable
 fun KanbanBoard(
     tasks: List<Task>,
@@ -68,8 +76,82 @@ fun KanbanBoard(
     onTaskDelete: (Int) -> Unit,
     onTaskStatusChange: (Int, KanbanColumn) -> Unit
 ) {
-    // Group tasks by Kanban columns using raw status from DB
-    // 0 = UNCOMPLETED, 1 = COMPLETED, 2 = IN_PROGRESS
+    val limitedTasksByColumn = rememberKanbanTasks(tasks)
+    
+    // Track dragged item
+    var dragInfo by remember { mutableStateOf<DragInfo?>(null) }
+    var dragOverColumn by remember { mutableStateOf<KanbanColumn?>(null) }
+    
+    // Track bounds
+    val columnBounds = remember { mutableStateMapOf<KanbanColumn, Rect>() }
+    var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    var boardWidthPx by remember { mutableStateOf(0f) }
+    val haptics = LocalHapticFeedback.current
+    val density = LocalDensity.current
+
+    val taskActions = remember(onTaskToggle, onTaskDelete, onTaskStatusChange) {
+        TaskActions(onTaskToggle, onTaskDelete, onTaskStatusChange)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(NeumorphicColors.background)
+            .onGloballyPositioned {
+                boardBounds = it.boundsInWindow()
+                boardWidthPx = it.size.width.toFloat()
+            }
+    ) {
+        KanbanColumnsLayout(
+            limitedTasksByColumn = limitedTasksByColumn,
+            collections = collections,
+            dragInfo = dragInfo,
+            dragOverColumn = dragOverColumn,
+            taskActions = taskActions,
+            onDragInfoChange = { newDragInfo -> dragInfo = newDragInfo },
+            onDragOverChange = { newDragOver -> 
+                 if (newDragOver != dragOverColumn && newDragOver != null) {
+                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                 }
+                 dragOverColumn = newDragOver
+            },
+            onColumnBoundsChange = { col, rect -> columnBounds[col] = rect },
+            columnBounds = columnBounds
+        )
+
+        KanbanBoardOverlay(
+            dragInfo = dragInfo,
+            collections = collections,
+            boardBounds = boardBounds,
+            boardWidthPx = boardWidthPx,
+            density = density
+        )
+    }
+}
+
+@Composable
+private fun KanbanBoardOverlay(
+    dragInfo: DragInfo?,
+    collections: Map<Int, String>,
+    boardBounds: Rect?,
+    boardWidthPx: Float,
+    density: androidx.compose.ui.unit.Density
+) {
+    if (dragInfo != null) {
+        val boardTopLeft = boardBounds?.topLeft ?: Offset.Zero
+        val cardWidthDp = with(density) { (boardWidthPx / 3f).toDp() }
+        
+        DraggedTaskOverlay(
+            dragInfo = dragInfo,
+            collections = collections,
+            boardTopLeftInWindow = boardTopLeft,
+            cardWidth = cardWidthDp
+        )
+    }
+}
+
+@Composable
+private fun rememberKanbanTasks(tasks: List<Task>): Map<KanbanColumn, List<KanbanTask>> {
     val tasksByColumn = remember(tasks) {
         tasks.groupBy { task ->
             when (task.status) {
@@ -82,139 +164,102 @@ fun KanbanBoard(
         }
     }
     
-    // OPTIMIZATION: Limit initial render to 15 items per column
-    // After initial render, progressively load all items
     val INITIAL_ITEM_LIMIT = 15
     var isFullyLoaded by remember { mutableStateOf(false) }
     
-    // Delay full load to allow animation to complete first
     LaunchedEffect(tasks) {
         isFullyLoaded = false
-        kotlinx.coroutines.delay(150) // Wait for mascot animation
+        kotlinx.coroutines.delay(150)
         isFullyLoaded = true
     }
     
-    val limitedTasksByColumn = remember(tasksByColumn, isFullyLoaded) {
-        if (isFullyLoaded) {
-            tasksByColumn
-        } else {
-            tasksByColumn.mapValues { (_, tasks) ->
-                tasks.take(INITIAL_ITEM_LIMIT)
-            }
-        }
+    return remember(tasksByColumn, isFullyLoaded) {
+        if (isFullyLoaded) tasksByColumn
+        else tasksByColumn.mapValues { (_, tasks) -> tasks.take(INITIAL_ITEM_LIMIT) }
     }
+}
 
-    // Track dragged item
-    var dragInfo by remember { mutableStateOf<DragInfo?>(null) }
-    var dragOverColumn by remember { mutableStateOf<KanbanColumn?>(null) }
-
-    // Track bounds of each column (row now) in window coordinates
-    val columnBounds = remember { mutableStateMapOf<KanbanColumn, Rect>() }
-    var boardBounds by remember { mutableStateOf<Rect?>(null) }
-    var boardWidthPx by remember { mutableStateOf(0f) }
+@Composable
+private fun KanbanColumnsLayout(
+    limitedTasksByColumn: Map<KanbanColumn, List<KanbanTask>>,
+    collections: Map<Int, String>,
+    dragInfo: DragInfo?,
+    dragOverColumn: KanbanColumn?,
+    taskActions: TaskActions,
+    onDragInfoChange: (DragInfo?) -> Unit,
+    onDragOverChange: (KanbanColumn?) -> Unit,
+    onColumnBoundsChange: (KanbanColumn, Rect) -> Unit,
+    columnBounds: Map<KanbanColumn, Rect>
+) {
     val haptics = LocalHapticFeedback.current
-
-    val density = LocalDensity.current
-
-    Box(
+    
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(NeumorphicColors.background)
-            .onGloballyPositioned {
-                boardBounds = it.boundsInWindow()
-                boardWidthPx = it.size.width.toFloat()
-            }
+            .padding(4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // stacked rows: one card per KanbanColumn
-            KanbanColumn.values().forEach { column ->
-                KanbanColumnCard(
-                    column = column,
-                    tasks = limitedTasksByColumn[column] ?: emptyList(),
-                    collections = collections,
-                    draggedItem = dragInfo?.item,
-                    isDragOver = dragOverColumn == column,
-                    onGloballyPositioned = { coords ->
-                        columnBounds[column] = coords.boundsInWindow()
-                    },
-                    onDragStart = { item, pointerInWindow, anchorInItem ->
+        KanbanColumn.values().forEach { column ->
+            val uiState = KanbanColumnUiState(
+                column = column,
+                tasks = limitedTasksByColumn[column] ?: emptyList(),
+                isDragOver = dragOverColumn == column,
+                draggedItem = dragInfo?.item
+            )
+
+            KanbanColumnCard(
+                uiState = uiState,
+                collections = collections,
+                onGloballyPositioned = { coords -> onColumnBoundsChange(column, coords.boundsInWindow()) },
+                dragActions = DragActions(
+                    onStart = { item, pointer, anchor ->
                         haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        dragInfo = DragInfo(item = item, pointerInWindow = pointerInWindow, anchorInItem = anchorInItem)
-                        dragOverColumn = columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointerInWindow) }?.key
+                        onDragInfoChange(DragInfo(item, pointer, anchor))
+                        onDragOverChange(columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
                     },
-                    onDrag = { pointerInWindow ->
-                        dragInfo = dragInfo?.copy(pointerInWindow = pointerInWindow)
-                        val hovered = columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointerInWindow) }?.key
-                        if (hovered != dragOverColumn) {
-                            dragOverColumn = hovered
-                            if (hovered != null) {
-                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                            }
-                        }
+                    onDrag = { pointer ->
+                        onDragInfoChange(dragInfo?.copy(pointerInWindow = pointer))
+                        onDragOverChange(columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
                     },
-                    onDragEnd = {
+                    onEnd = {
                         val target = dragOverColumn
                         val item = dragInfo?.item
                         if (target != null && item != null && target != item.column) {
-                            onTaskStatusChange(item.task.id, target)
+                            taskActions.onStatusChange?.invoke(item.task.id, target)
                         }
-                        dragInfo = null
-                        dragOverColumn = null
-                    },
-                    onTaskToggle = onTaskToggle,
-                    onTaskDelete = onTaskDelete,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .heightIn(min = 250.dp)
-                )
-            }
-        }
-
-        val overlay = dragInfo
-        if (overlay != null) {
-            val boardTopLeft = boardBounds?.topLeft ?: Offset.Zero
-            val cardWidthDp = with(density) {
-                // Approximate one grid column width
-                (boardWidthPx / 3f).toDp()
-            }
-            DraggedTaskOverlay(
-                kanbanTask = overlay.item,
-                collections = collections,
-                pointerInWindow = overlay.pointerInWindow,
-                anchorInItem = overlay.anchorInItem,
-                boardTopLeftInWindow = boardTopLeft,
-                cardWidth = cardWidthDp,
-                modifier = Modifier.zIndex(10f)
+                        onDragInfoChange(null)
+                        onDragOverChange(null)
+                    }
+                ),
+                taskActions = taskActions,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .heightIn(min = 250.dp)
             )
         }
     }
 }
 
+
+data class KanbanColumnUiState(
+    val column: KanbanColumn,
+    val tasks: List<KanbanTask>,
+    val isDragOver: Boolean,
+    val draggedItem: KanbanTask?
+)
+
 @Composable
-fun DraggedTaskOverlay(
-    kanbanTask: KanbanTask,
+private fun DraggedTaskOverlay(
+    dragInfo: DragInfo,
     collections: Map<Int, String>,
-    pointerInWindow: Offset,
-    anchorInItem: Offset,
     boardTopLeftInWindow: Offset,
     cardWidth: Dp,
     modifier: Modifier = Modifier
 ) {
-    val task = kanbanTask.task
-    val offsetX = (pointerInWindow.x - boardTopLeftInWindow.x - anchorInItem.x).roundToInt()
-    val offsetY = (pointerInWindow.y - boardTopLeftInWindow.y - anchorInItem.y).roundToInt()
-
-    val priorityColor = when (task.priority) {
-        Priority.HIGH -> NeumorphicColors.priorityHigh
-        Priority.NORMAL -> NeumorphicColors.priorityNormal
-        Priority.LOW -> NeumorphicColors.priorityLow
-    }
+    val task = dragInfo.item.task
+    val offsetX = (dragInfo.pointerInWindow.x - boardTopLeftInWindow.x - dragInfo.anchorInItem.x).roundToInt()
+    val offsetY = (dragInfo.pointerInWindow.y - boardTopLeftInWindow.y - dragInfo.anchorInItem.y).roundToInt()
 
     Card(
         modifier = modifier
@@ -225,76 +270,31 @@ fun DraggedTaskOverlay(
         colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-        ) {
-            // Top priority color line
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(priorityColor)
-            )
-
-            Column(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .fillMaxWidth()
-            ) {
-                Text(
-                    text = task.title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = NeumorphicColors.textPrimary,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        task.collectionId?.let { cid ->
-                            val name = collections[cid] ?: cid.toString()
-                            Text(
-                                text = stringResource(R.string.collection_prefix, name),
-                                fontSize = 12.sp,
-                                color = NeumorphicColors.textSecondary
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.DragHandle,
-                        contentDescription = stringResource(R.string.cd_drag),
-                        tint = NeumorphicColors.textSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
+        KanbanTaskContent(
+            task = task,
+            collectionName = task.collectionId?.let { collections[it] ?: it.toString() },
+            isOverlay = true,
+            onToggle = {},
+            onDelete = {},
+            onHandlePositioned = {},
+            onDragStart = {},
+            onDrag = {},
+            onDragEnd = {}
+        )
     }
 }
 
 @Composable
 private fun KanbanColumnCard(
-    column: KanbanColumn,
-    tasks: List<KanbanTask>,
+    uiState: KanbanColumnUiState,
     collections: Map<Int, String>,
-    draggedItem: KanbanTask?,
-    isDragOver: Boolean,
     onGloballyPositioned: (LayoutCoordinates) -> Unit,
-    onDragStart: (KanbanTask, Offset, Offset) -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-    onTaskToggle: (Int) -> Unit,
-    onTaskDelete: (Int) -> Unit,
+    dragActions: DragActions,
+    taskActions: TaskActions,
     modifier: Modifier = Modifier
 ) {
     val targetColor by animateColorAsState(
-        targetValue = if (isDragOver) NeumorphicColors.accentMint.copy(alpha = 0.12f) else NeumorphicColors.surface,
+        targetValue = if (uiState.isDragOver) NeumorphicColors.accentMint.copy(alpha = 0.12f) else NeumorphicColors.surface,
         label = "kanban_drop_target"
     )
 
@@ -313,27 +313,7 @@ private fun KanbanColumnCard(
                 .padding(12.dp)
         ) {
             // Column header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-              
-                    Text(
-                        text = column.title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NeumorphicColors.textPrimary
-                    )
-                    Text(
-                        text = "${tasks.size} công việc",
-                        fontSize = 12.sp,
-                        color = NeumorphicColors.textSecondary
-                    )
-                
-            }
+            KanbanColumnHeader(uiState.column, uiState.tasks.size)
 
             // Task list - 3 column grid
             LazyVerticalGrid(
@@ -345,31 +325,49 @@ private fun KanbanColumnCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 8.dp)
             ) {
-                items(tasks, key = { it.task.id }) { kanbanTask ->
+                items(uiState.tasks, key = { it.task.id }) { kanbanTask ->
                     DraggableKanbanTask(
                         kanbanTask = kanbanTask,
                         collections = collections,
-                        isBeingDragged = draggedItem == kanbanTask,
-                        onDragStart = { pointerInWindow: Offset, anchorInItem: Offset ->
-                            onDragStart(kanbanTask, pointerInWindow, anchorInItem)
-                        },
-                        onDrag = onDrag,
-                        onDragEnd = onDragEnd,
-                        onToggle = { onTaskToggle(kanbanTask.task.id) },
-                        onDelete = { onTaskDelete(kanbanTask.task.id) }
+                        isBeingDragged = uiState.draggedItem == kanbanTask,
+                        dragActions = dragActions,
+                        taskActions = taskActions
                     )
                 }
             }
             
-            // Performance logging
-            androidx.compose.runtime.SideEffect {
-                PerfLogger.logRender(
+            // Performance logging render
+            LaunchedEffect(uiState.tasks.size) {
+                 PerfLogger.logRender(
                     file = "KanbanBoard.kt",
-                    function = "KanbanColumnCard(${column.title})",
-                    itemCount = tasks.size
+                    function = "KanbanColumnCard(${uiState.column.title})",
+                    itemCount = uiState.tasks.size
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun KanbanColumnHeader(column: KanbanColumn, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = column.title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = NeumorphicColors.textPrimary
+        )
+        Text(
+            text = "$count công việc",
+            fontSize = 12.sp,
+            color = NeumorphicColors.textSecondary
+        )
     }
 }
 
@@ -378,11 +376,8 @@ private fun DraggableKanbanTask(
     kanbanTask: KanbanTask,
     collections: Map<Int, String>,
     isBeingDragged: Boolean,
-    onDragStart: (Offset, Offset) -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit
+    dragActions: DragActions,
+    taskActions: TaskActions
 ) {
     val task = kanbanTask.task
     var cardRectInWindow by remember { mutableStateOf<Rect?>(null) }
@@ -392,12 +387,6 @@ private fun DraggableKanbanTask(
         targetValue = if (isBeingDragged) 0f else 1f,
         label = "kanban_drag_alpha"
     )
-
-    val priorityColor = when (task.priority) {
-        Priority.HIGH -> NeumorphicColors.priorityHigh
-        Priority.NORMAL -> NeumorphicColors.priorityNormal
-        Priority.LOW -> NeumorphicColors.priorityLow
-    }
 
     Card(
         modifier = Modifier
@@ -413,54 +402,88 @@ private fun DraggableKanbanTask(
             defaultElevation = if (isBeingDragged) 8.dp else 2.dp
         )
     ) {
-        Column(
+        KanbanTaskContent(
+            task = task,
+            collectionName = task.collectionId?.let { collections[it] ?: it.toString() },
+            isOverlay = false,
+            onToggle = { taskActions.onToggle(task.id) },
+            onDelete = { taskActions.onDelete(task.id) },
+            onHandlePositioned = { handleRectInWindow = it.boundsInWindow() },
+            onDragStart = { offset ->
+                val card = cardRectInWindow
+                val handle = handleRectInWindow
+                if (card != null && handle != null) {
+                    val pointerInWindow = handle.topLeft + offset
+                    val anchorInItem = pointerInWindow - card.topLeft
+                    dragActions.onStart(kanbanTask, pointerInWindow, anchorInItem)
+                }
+            },
+            onDrag = dragActions.onDrag,
+            onDragEnd = dragActions.onEnd
+        )
+    }
+}
+
+@Composable
+private fun KanbanTaskContent(
+    task: Task,
+    collectionName: String?,
+    isOverlay: Boolean,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+    onHandlePositioned: (LayoutCoordinates) -> Unit,
+    onDragStart: (Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit
+) {
+    val priorityColor = when (task.priority) {
+        Priority.HIGH -> NeumorphicColors.priorityHigh
+        Priority.NORMAL -> NeumorphicColors.priorityNormal
+        Priority.LOW -> NeumorphicColors.priorityLow
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Top priority color line
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(3.dp)
+                .background(priorityColor)
+        )
+
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .fillMaxWidth()
         ) {
-            // Top priority color line
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(priorityColor)
+            // Task title
+            Text(
+                text = task.title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = NeumorphicColors.textPrimary,
+                modifier = Modifier.padding(bottom = 4.dp)
             )
 
-            Column(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .fillMaxWidth()
+            // Task metadata and actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Task title
-                Text(
-                    text = task.title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = NeumorphicColors.textPrimary,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-
-                // Task metadata and actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        task.collectionId?.let { cid ->
-                            val name = collections[cid] ?: cid.toString()
-                            Text(
-                                text = stringResource(R.string.collection_prefix, name),
-                                fontSize = 12.sp,
-                                color = NeumorphicColors.textSecondary
-                            )
-                        }
+                Column(modifier = Modifier.weight(1f)) {
+                    if (collectionName != null) {
+                        Text(
+                            text = stringResource(R.string.collection_prefix, collectionName),
+                            fontSize = 12.sp,
+                            color = NeumorphicColors.textSecondary
+                        )
                     }
+                }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onToggle,
-                            modifier = Modifier.size(32.dp)
-                        ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!isOverlay) {
+                        IconButton(onClick = onToggle, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = stringResource(R.string.cd_done),
@@ -469,10 +492,7 @@ private fun DraggableKanbanTask(
                             )
                         }
 
-                        IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(32.dp)
-                        ) {
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = stringResource(R.string.cd_delete),
@@ -481,36 +501,32 @@ private fun DraggableKanbanTask(
                             )
                         }
 
-                        // Drag handle: long-press then drag
+                        // Interactive Drag handle
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .onGloballyPositioned { handleRectInWindow = it.boundsInWindow() }
+                                .onGloballyPositioned(onHandlePositioned)
                                 .pointerInput(Unit) {
                                     detectDragGesturesAfterLongPress(
-                                        onDragStart = { offset ->
-                                            val card = cardRectInWindow
-                                            val handle = handleRectInWindow
-                                            if (card != null && handle != null) {
-                                                val pointerInWindow = handle.topLeft + offset
-                                                val anchorInItem = pointerInWindow - card.topLeft
-                                                onDragStart(pointerInWindow, anchorInItem)
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            onDragEnd()
-                                        },
-                                        onDragCancel = {
-                                            // Cleanup drag state when gesture is cancelled
-                                            onDragEnd()
-                                        }
-                                    ) { change, _ ->
-                                        val handle = handleRectInWindow
-                                        if (handle != null) {
-                                            onDrag(handle.topLeft + change.position)
-                                        }
-                                    }
+                                        onDragStart = onDragStart,
+                                        onDragEnd = onDragEnd,
+                                        onDragCancel = onDragEnd,
+                                        onDrag = { change, _ -> onDrag(change.position) }
+                                    )
                                 },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = stringResource(R.string.cd_drag),
+                                tint = NeumorphicColors.textSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    } else {
+                        // Overlay Drag handle (Visual only)
+                        Box(
+                            modifier = Modifier.size(40.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -523,10 +539,6 @@ private fun DraggableKanbanTask(
                     }
                 }
             }
-        }
-
-        if (isBeingDragged) {
-            Spacer(modifier = Modifier.height(0.dp))
         }
     }
 }

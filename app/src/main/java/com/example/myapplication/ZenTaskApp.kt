@@ -1,274 +1,114 @@
 package com.example.myapplication
 
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import kotlinx.coroutines.delay
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // Import này chứa getValue và setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.data.local.db.TodoDatabase
-import com.example.myapplication.data.local.db.entity.Task as DbTask
-import com.example.myapplication.data.local.db.entity.TaskGroup as DbTaskGroup
 import com.example.myapplication.model.Collection as UiCollection
 import com.example.myapplication.model.NavigationItem
-import com.example.myapplication.model.Priority
-import com.example.myapplication.model.Task
 import com.example.myapplication.ui.components.MascotBottomNav
 import com.example.myapplication.ui.components.NeumorphicFAB
 import com.example.myapplication.ui.screens.*
-import com.example.myapplication.ui.screens.home.kanban.KanbanHomeScreen
-import com.example.myapplication.ui.screens.home.kanban.KanbanColumn
-import com.example.myapplication.ui.screens.calendar.CalendarScreen
 import com.example.myapplication.ui.components.FloatingCommandDeck
+import com.example.myapplication.ui.components.ZenTaskContent
 import com.example.myapplication.ui.sheets.AddCollectionSheet
 import com.example.myapplication.ui.sheets.AddTaskSheet
 import com.example.myapplication.ui.theme.NeumorphicColors
 import java.time.LocalDate
-import java.time.Instant
-import java.time.ZoneId
+import java.time.LocalDateTime
 import com.example.myapplication.utils.PerfLogger
+import com.example.myapplication.model.Task
+import com.example.myapplication.model.Priority
+import com.example.myapplication.model.toUiTask
+import com.example.myapplication.model.toUiCollection
+import com.example.myapplication.ui.state.rememberZenTaskAppState
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
-    var currentScreen by remember { mutableStateOf(NavigationItem.MY_DAY) }
-    // Deffered Rendering: Dùng state này cho nội dung bên dưới để delay việc load, nhường tài nguyên cho Animation Mèo chạy trước
-    var renderedScreen by remember { mutableStateOf(NavigationItem.MY_DAY) }
-    var showAddTaskSheet by remember { mutableStateOf(false) }
-    var showAddCollectionSheet by remember { mutableStateOf(false) }
-
-    val context = LocalContext.current
-    val tag = "ZenTaskApp"
-    val coroutineScope = rememberCoroutineScope()
-    val db = remember { TodoDatabase.getInstance(context.applicationContext) }
-    val taskDao = remember(db) { db.taskDao() }
-    val taskGroupDao = remember(db) { db.taskGroupDao() }
-
-    val dbTasks by taskDao.observeAll().collectAsState(initial = emptyList())
-    val tasks by remember(dbTasks) { derivedStateOf { dbTasks.map { it.toUiTask() } } }
-
-    val dbCollections by taskGroupDao.observeAll().collectAsState(initial = emptyList())
-    val collections by remember(dbCollections) {
-        derivedStateOf { dbCollections.map { it.toUiCollection() } }
-    }
-
-    // Collection name map for UI components
+    val appState = rememberZenTaskAppState()
+    
+    // Derived State from Flow
+    val tasks by appState.tasksFlow.collectAsState(initial = emptyList<Task>())
+    val collections by appState.collectionsFlow.collectAsState(initial = emptyList<UiCollection>())
+    
     val collectionNameMap by remember(collections) {
         derivedStateOf { collections.associate { it.id to it.name } }
     }
 
-    // Chọn collection hiện tại
-    var selectedCollection by remember { mutableStateOf<UiCollection?>(null) }
-
-    // Stable current date that updates at midnight so 'todayTasks' refreshes automatically
-    val currentDate = remember { mutableStateOf(LocalDate.now()) }
-
-    // Controls when bottom navigation and FAB appear with entrance animation
-    var chromeVisible by remember { mutableStateOf(false) }
-
-    // Toggle for the Floating Command Deck (Menu)
-    var isMenuVisible by remember { mutableStateOf(false) }
-    
-    // Dynamic Slot State
-    var dynamicSlotItem by remember { mutableStateOf<NavigationItem?>(null) }
-
-    LaunchedEffect(currentScreen) {
-        if (currentScreen != NavigationItem.COLLECTIONS) {
-            showAddTaskSheet = false
+    val tasksBySelectedCollection by remember(appState.selectedCollection, tasks) {
+        derivedStateOf {
+            appState.selectedCollection?.let { col -> 
+                tasks.filter { it.collectionId == col.id } 
+            } ?: emptyList()
         }
-        android.util.Log.d("ZenTaskApp", "Screen changed to: $currentScreen. Waiting for debounce...")
-        PerfLogger.logAction(
-            file = "ZenTaskApp.kt",
-            function = "LaunchedEffect(currentScreen)",
-            action = "Screen changing to ${currentScreen.name}"
-        )
-        
-        // INCREASED (Final): Delay 350ms - chờ animation hoàn toàn kết thúc trước khi render content
-        // Việc này đảm bảo UI thread hoàn toàn rảnh rỗi cho animation Spring
-        delay(350) 
-        renderedScreen = currentScreen
-        android.util.Log.d("ZenTaskApp", "Rendered screen updated to: $renderedScreen")
     }
 
-    SideEffect {
-        android.util.Log.d("ZenTaskApp", "Recomposing ZenTaskApp. Current: $currentScreen")
+    // Effect: Screen Change Handling
+    LaunchedEffect(appState.currentScreen) {
+        appState.onScreenChange(appState.currentScreen)
     }
 
+    // Effect: Update Current Date at Midnight
     LaunchedEffect(Unit) {
         while (true) {
             val now = LocalDateTime.now()
             val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay()
             val waitMillis = java.time.Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1000)
             delay(waitMillis)
-            currentDate.value = LocalDate.now()
+            appState.currentDate = LocalDate.now()
         }
     }
 
-    // Delay chrome (bottom nav & FAB) entrance slightly after content
+    // Effect: Chrome Entrance
     LaunchedEffect(Unit) {
         onAppReady?.invoke()
-        delay(500)
-        chromeVisible = true
+        kotlinx.coroutines.delay(500)
+        appState.chromeVisible = true
     }
 
-    // Memoize filtered lists; derivedStateOf will track snapshot reads (no extra keys required)
-    val todayTasks by remember { derivedStateOf { tasks.filter { it.dueDate == currentDate.value } } }
-    val tasksBySelectedCollection by remember { derivedStateOf {
-        selectedCollection?.let { col -> tasks.filter { it.collectionId == col.id } } ?: emptyList()
-    } }
-
+    // Effect: Validate Selected Collection
     LaunchedEffect(collections) {
-        val currentSelectedId = selectedCollection?.id ?: return@LaunchedEffect
+        val currentSelectedId = appState.selectedCollection?.id ?: return@LaunchedEffect
         if (collections.none { it.id == currentSelectedId }) {
-            selectedCollection = null
+            appState.selectedCollection = null
         }
     }
 
-    fun showToast(message: String) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
-
-    val lastNonCompletedStatus = remember { mutableStateMapOf<Int, Int>() }
-
-    fun handleTaskToggle(id: Int) {
-        coroutineScope.launch {
-            try {
-                val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                if (current == null) {
-                    Log.w(tag, "Toggle task failed: taskId=$id not found")
-                    showToast("Không tìm thấy công việc")
-                    return@launch
-                }
-
-                val newStatus = if (current.status == 1) {
-                    lastNonCompletedStatus.remove(id) ?: 0
-                } else {
-                    lastNonCompletedStatus[id] = current.status
-                    1
-                }
-
-                withContext(Dispatchers.IO) {
-                    taskDao.update(current.copy(status = newStatus))
-                }
-            } catch (t: Throwable) {
-                Log.e(tag, "Toggle task failed: taskId=$id", t)
-                showToast("Lỗi khi cập nhật công việc")
-            }
-        }
-    }
-
-    fun handleTaskDelete(id: Int) {
-        coroutineScope.launch {
-            try {
-                lastNonCompletedStatus.remove(id)
-                withContext(Dispatchers.IO) { taskDao.deleteById(id) }
-            } catch (t: Throwable) {
-                Log.e(tag, "Delete task failed: taskId=$id", t)
-                showToast("Lỗi khi xoá công việc")
-            }
-        }
-    }
-
+    // Render UI
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
-                // Track if content is still being rendered (during deferred load)
-                val isRendering = currentScreen != renderedScreen
-                
-                // Show skeleton placeholder during transition
-                if (isRendering) {
-                    when (currentScreen) {
-                        NavigationItem.MY_DAY -> com.example.myapplication.ui.components.SkeletonKanbanScreen(
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        NavigationItem.CALENDAR -> com.example.myapplication.ui.components.SkeletonTaskList(
-                            itemCount = 5,
-                            modifier = Modifier.fillMaxSize().padding(top = 100.dp)
-                        )
-                        else -> Box(Modifier.fillMaxSize()) // Empty placeholder for other screens
-                    }
-                }
-                
-                // Sử dụng Crossfade để chuyển đổi màn hình mượt mà hơn, tránh hiện tượng giật cục khi spam tab
-                androidx.compose.animation.Crossfade(
-                    targetState = renderedScreen, // Sử dụng renderedScreen (đã delay) thay vì currentScreen
-                    label = "ScreenTransition",
-                    animationSpec = tween(durationMillis = 300) // Thời gian chuyển cảnh hợp lý
-                ) { targetScreen ->
-                    when (targetScreen) {
-                        NavigationItem.MY_DAY -> KanbanHomeScreen(
-                            tasks = tasks,
-                            collections = collectionNameMap,
-                            onTaskToggle = ::handleTaskToggle,
-                            onTaskDelete = ::handleTaskDelete,
-                            onTaskStatusChange = { id, column ->
-                                coroutineScope.launch {
-                                    try {
-                                        val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                                        if (current != null) {
-                                            val newStatus = when (column) {
-                                                KanbanColumn.COMPLETED -> 1 // completed
-                                                KanbanColumn.IN_PROGRESS -> 2 // in-progress
-                                                KanbanColumn.UNCOMPLETED -> 0 // uncompleted
-                                            }
-
-                                            withContext(Dispatchers.IO) {
-                                                // Only change status; keep priority as user set
-                                                taskDao.update(
-                                                    current.copy(status = newStatus)
-                                                )
-                                            }
-
-                                            if (newStatus == 1 && current.status != 1) {
-                                                lastNonCompletedStatus[id] = current.status
-                                            } else if (newStatus != 1) {
-                                                lastNonCompletedStatus[id] = newStatus
-                                            }
-                                        }
-                                    } catch (t: Throwable) {
-                                        Log.e(tag, "Change status failed: taskId=$id", t)
-                                        showToast("Lỗi khi cập nhật trạng thái")
-                                    }
-                                }
-                            }
-                        )
-                        NavigationItem.CALENDAR -> CalendarScreen(
-                            tasks = tasks,
-                            collections = collections,
-                            onTaskToggle = ::handleTaskToggle,
-                            onTaskDelete = ::handleTaskDelete
-                        )
-                        NavigationItem.COLLECTIONS -> CollectionsScreen(
-                            collections,
-                            tasks,
-                            { selectedCollection = it },
-                            { showAddCollectionSheet = true }
-                        )
-                        NavigationItem.SETTINGS -> SettingsScreen()
-                    }
-                }
-            }
+            ZenTaskContent(
+                currentScreen = appState.currentScreen,
+                renderedScreen = appState.renderedScreen,
+                tasks = tasks,
+                collections = collections,
+                collectionNameMap = collectionNameMap,
+                selectedCollection = appState.selectedCollection,
+                onTaskToggle = appState::toggleTask,
+                onTaskDelete = appState::deleteTask,
+                onTaskStatusChange = appState::changeTaskStatus,
+                onCollectionSelected = { appState.selectedCollection = it },
+                onAddCollectionClick = { appState.showAddCollectionSheet = true },
+                modifier = Modifier.weight(1f)
+            )
 
             AnimatedVisibility(
-                visible = chromeVisible,
+                visible = appState.chromeVisible,
                 enter = slideInVertically(
                     initialOffsetY = { fullHeight -> fullHeight },
                     animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
@@ -277,38 +117,28 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                 )
             ) {
                 MascotBottomNav(
-                    currentScreen = currentScreen,
-                    isMenuOpen = isMenuVisible,
-                    dynamicSlotIcon = dynamicSlotItem?.let { 
+                    currentScreen = appState.currentScreen,
+                    isMenuOpen = appState.isMenuVisible,
+                    dynamicSlotIcon = appState.dynamicSlotItem?.let { 
                         when (it) {
                              NavigationItem.SETTINGS -> Icons.Filled.Settings
                              else -> null
                         }
                     },
-                    onMenuClick = { isMenuVisible = !isMenuVisible },
+                    onMenuClick = { appState.isMenuVisible = !appState.isMenuVisible },
                     onDynamicSlotClick = { 
-                        if (dynamicSlotItem != null) {
-                            currentScreen = dynamicSlotItem!!
+                        if (appState.dynamicSlotItem != null) {
+                            appState.currentScreen = appState.dynamicSlotItem!!
                         } else {
-                            // If empty, click opens the menu to let user choose
-                            isMenuVisible = true
+                            appState.isMenuVisible = true
                         }
                     },
-                    onNavigate = { item ->
-                        PerfLogger.logAction(
-                            file = "ZenTaskApp.kt",
-                            function = "MascotBottomNav.onNavigate",
-                            action = "Navigate to ${item.name}"
-                        )
-                        isMenuVisible = false
-                        currentScreen = item
-                    }
+                    onNavigate = appState::navigateTo
                 )
             }
         }
 
-        // Floating Command Deck (Menu)
-        // Anchor: BottomEnd with padding to appear above the 4th tab
+        // Floating Command Deck
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -316,24 +146,26 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
             contentAlignment = Alignment.BottomEnd
         ) {
             FloatingCommandDeck(
-                isVisible = isMenuVisible && chromeVisible,
-                onDismiss = { isMenuVisible = false },
+                isVisible = appState.isMenuVisible && appState.chromeVisible,
+                onDismiss = { appState.isMenuVisible = false },
                 onSettingsClick = {
-                    isMenuVisible = false
-                    dynamicSlotItem = NavigationItem.SETTINGS
-                    currentScreen = NavigationItem.SETTINGS
+                    appState.onMenuAction {
+                        appState.dynamicSlotItem = NavigationItem.SETTINGS
+                        appState.currentScreen = NavigationItem.SETTINGS
+                    }
                 },
                 onLogoutClick = {
-                    isMenuVisible = false
-                    // TODO: Implement logout logic
-                    showToast("Logout Clicked")
+                    appState.onMenuAction {
+                        appState.showToast("Logout Clicked")
+                    }
                 }
             )
         }
 
-        if (currentScreen == NavigationItem.COLLECTIONS) {
+        // FAB
+        if (appState.currentScreen == NavigationItem.COLLECTIONS && !appState.isMenuVisible) {
             AnimatedVisibility(
-                visible = chromeVisible,
+                visible = appState.chromeVisible,
                 enter = slideInVertically(
                     initialOffsetY = { fullHeight -> fullHeight / 2 },
                     animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
@@ -342,7 +174,7 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                 )
             ) {
                 NeumorphicFAB(
-                    onClick = { showAddTaskSheet = true },
+                    onClick = { appState.showAddTaskSheet = true },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 24.dp, bottom = 90.dp)
@@ -350,130 +182,42 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
             }
         }
 
-        // Các Bottom Sheet
-        if (showAddTaskSheet && currentScreen == NavigationItem.COLLECTIONS) {
-            ModalBottomSheet({ showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
-                AddTaskSheet({ t, desc, d, p, c, imageUri ->
-                    coroutineScope.launch {
-                        try {
-                            val targetCollectionId = c ?: selectedCollection?.id
-
-                            val (validatedGroupId, wasInvalidGroup) = withContext(Dispatchers.IO) {
-                                if (targetCollectionId == null) {
-                                    null to false
-                                } else {
-                                    val exists = taskGroupDao.getById(targetCollectionId) != null
-                                    if (exists) targetCollectionId to false else null to true
-                                }
-                            }
-
-                            if (wasInvalidGroup) {
-                                Log.w(tag, "Add task: groupId=$targetCollectionId not found; saving as uncategorized")
-                                showToast("Danh mục không còn tồn tại, sẽ lưu vào Không phân loại")
-                            }
-
-                            withContext(Dispatchers.IO) {
-                                taskDao.upsert(
-                                    DbTask(
-                                        title = t,
-                                        description = desc,
-                                        progressNotes = null,
-                                        dueDate = d?.toEpochMillis(),
-                                        urlLink = null,
-                                        imagePath = imageUri,
-                                        status = 0,
-                                        priority = p.toDbPriority(),
-                                        groupId = validatedGroupId
-                                    )
-                                )
-                            }
-                        } catch (t: Throwable) {
-                            Log.e(tag, "Add task failed", t)
-                            showToast("Lỗi khi thêm công việc")
-                        }
-                    }
-                    showAddTaskSheet = false
-                }, { showAddTaskSheet = false })
+        // Sheets
+        if (appState.showAddTaskSheet && appState.currentScreen == NavigationItem.COLLECTIONS) {
+            ModalBottomSheet({ appState.showAddTaskSheet = false }, containerColor = NeumorphicColors.surface) {
+                AddTaskSheet(
+                    onAddTask = { t, desc, d, p, c, img ->
+                        appState.addTask(t, desc, d, p, c, img)
+                        appState.showAddTaskSheet = false
+                    },
+                    onDismiss = { appState.showAddTaskSheet = false }
+                )
             }
         }
 
-        if (showAddCollectionSheet) {
-            ModalBottomSheet({ showAddCollectionSheet = false }, containerColor = NeumorphicColors.surface) {
-                AddCollectionSheet({ n, c ->
-                    coroutineScope.launch {
-                        try {
-                            withContext(Dispatchers.IO) {
-                                taskGroupDao.upsert(
-                                    DbTaskGroup(
-                                        groupName = n,
-                                        groupColor = c.toArgb(),
-                                        description = null
-                                    )
-                                )
-                            }
-                            showAddCollectionSheet = false
-                        } catch (t: Throwable) {
-                            Log.e(tag, "Add collection failed", t)
-                            showToast("Lỗi khi tạo danh mục")
-                        }
-                    }
-                }, { showAddCollectionSheet = false })
+        if (appState.showAddCollectionSheet) {
+            ModalBottomSheet({ appState.showAddCollectionSheet = false }, containerColor = NeumorphicColors.surface) {
+                AddCollectionSheet(
+                    onAddCollection = { n, c ->
+                        appState.addCollection(n, c)
+                        appState.showAddCollectionSheet = false
+                    },
+                    onDismiss = { appState.showAddCollectionSheet = false }
+                )
             }
         }
 
         // Detail View
-        selectedCollection?.let { collection ->
+        appState.selectedCollection?.let { collection ->
             CollectionDetailView(
                 collection,
                 tasksBySelectedCollection,
-                { selectedCollection = null },
-                ::handleTaskToggle,
-                ::handleTaskDelete
+                { appState.selectedCollection = null },
+                appState::toggleTask,
+                appState::deleteTask
             )
         }
     }
 }
 
-private fun DbTask.toUiTask(): Task {
-    val zone = ZoneId.of("UTC")
-    return Task(
-        id = id,
-        title = title,
-        dueDate = dueDate?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() },
-        priority = priority.toUiPriority(),
-        status = status,
-        isCompleted = status == 1,
-        collectionId = groupId,
-        description = description,
-        imageUri = imagePath
-    )
-}
 
-private fun Int.toUiPriority(): Priority {
-    return when (this) {
-        0 -> Priority.LOW
-        2 -> Priority.HIGH
-        else -> Priority.NORMAL
-    }
-}
-
-private fun Priority.toDbPriority(): Int {
-    return when (this) {
-        Priority.LOW -> 0
-        Priority.NORMAL -> 1
-        Priority.HIGH -> 2
-    }
-}
-
-private fun LocalDate.toEpochMillis(): Long {
-    return atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
-}
-
-private fun DbTaskGroup.toUiCollection(): UiCollection {
-    return UiCollection(
-        id = groupId,
-        name = groupName,
-        color = Color(groupColor),
-        icon = Icons.Default.List
-    )
-}
