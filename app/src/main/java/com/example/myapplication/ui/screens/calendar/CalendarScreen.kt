@@ -202,9 +202,8 @@ private fun TaskListSection(
         val initialItemLimit = 15
         var isFullyLoaded by remember { mutableStateOf(false) }
         
-        LaunchedEffect(combinedItems) {
-            isFullyLoaded = false
-            kotlinx.coroutines.delay(150) // Wait for animation
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(150)
             isFullyLoaded = true
         }
         

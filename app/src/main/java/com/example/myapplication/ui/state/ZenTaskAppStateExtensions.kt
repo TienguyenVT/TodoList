@@ -134,12 +134,17 @@ fun ZenTaskAppState.changeTaskStatus(id: Int, column: KanbanColumn) {
 }
 
 private suspend fun ZenTaskAppState.processStatusChange(id: Int, column: KanbanColumn) {
-    val current = withContext(Dispatchers.IO) { taskDao.getById(id) } ?: return
+    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+    if (current == null) {
+        Log.w(TAG, "Change status failed: taskId=$id not found")
+        context.showToast("Không tìm thấy công việc")
+        return
+    }
     
     val newStatus = when (column) {
-        KanbanColumn.COMPLETED -> 1
-        KanbanColumn.IN_PROGRESS -> 2
-        KanbanColumn.UNCOMPLETED -> 0
+        KanbanColumn.COMPLETED -> com.example.myapplication.model.Task.COMPLETED
+        KanbanColumn.IN_PROGRESS -> com.example.myapplication.model.Task.IN_PROGRESS
+        KanbanColumn.UNCOMPLETED -> com.example.myapplication.model.Task.UNCOMPLETED
     }
     
     withContext(Dispatchers.IO) {

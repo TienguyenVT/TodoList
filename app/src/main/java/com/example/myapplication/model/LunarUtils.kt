@@ -116,7 +116,7 @@ object LunarUtils {
         val b11 = lunarYearData.second
         val lunarYear = lunarYearData.third
 
-        val monthData = calculateLunarMonth(dayNumber, monthStart, a11, b11, timeZone)
+        val monthData = calculateLunarMonth(monthStart, a11, b11, timeZone)
         
         return LunarDate(
             day = dayNumber - monthStart + 1,
@@ -134,7 +134,7 @@ object LunarUtils {
         return Triple(a11, getLunarMonth11(year + 1, timeZone), year)
     }
 
-    private fun calculateLunarMonth(dayNumber: Int, monthStart: Int, a11: Int, b11: Int, timeZone: Double): Pair<Int, Boolean> {
+    private fun calculateLunarMonth(monthStart: Int, a11: Int, b11: Int, timeZone: Double): Pair<Int, Boolean> {
         val diff = floor((monthStart - a11) / 29.0).toInt()
         var lunarMonth = diff + 11
         var isLeap = false

@@ -18,4 +18,10 @@ data class Task(
     val collectionId: Int? = null,
     val description: String? = null,
     val imageUri: String? = null
-)
+) {
+    companion object {
+        const val UNCOMPLETED = 0
+        const val COMPLETED = 1
+        const val IN_PROGRESS = 2
+    }
+}

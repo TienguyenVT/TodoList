@@ -104,11 +104,7 @@ fun AddTaskSheet(
                 pickImageLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             },
             onCaptureImage = {
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    launchCameraCapture()
-                } else {
-                    requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
+                handleCameraClick(context, { launchCameraCapture() }, requestCameraPermissionLauncher)
             }
         )
 

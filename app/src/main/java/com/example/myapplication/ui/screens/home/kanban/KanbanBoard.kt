@@ -144,8 +144,8 @@ private fun rememberKanbanTasks(tasks: List<Task>): Map<KanbanColumn, List<Kanba
     val tasksByColumn = remember(tasks) {
         tasks.groupBy { task ->
             when (task.status) {
-                1 -> KanbanColumn.COMPLETED
-                2 -> KanbanColumn.IN_PROGRESS
+                Task.COMPLETED -> KanbanColumn.COMPLETED
+                Task.IN_PROGRESS -> KanbanColumn.IN_PROGRESS
                 else -> KanbanColumn.UNCOMPLETED
             }
         }.mapValues { entry ->
@@ -271,7 +271,7 @@ private fun DraggedTaskOverlay(
     ) {
         KanbanTaskContent(
             task = task,
-            collectionName = task.collectionId?.let { collections[it] ?: it.toString() },
+            collectionName = task.collectionId?.let { collections[it] },
             isOverlay = true,
             callbacks = KanbanTaskCallbacks(
                 onToggle = {},

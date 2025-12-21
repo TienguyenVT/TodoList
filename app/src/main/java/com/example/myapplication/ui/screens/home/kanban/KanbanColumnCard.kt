@@ -76,7 +76,7 @@ fun KanbanColumnCard(
             // Performance logging render
             LaunchedEffect(uiState.tasks.size) {
                  PerfLogger.logRender(
-                    file = "KanbanBoard.kt",
+                    file = "KanbanColumnCard.kt",
                     function = "KanbanColumnCard(${uiState.column.title})",
                     itemCount = uiState.tasks.size
                 )

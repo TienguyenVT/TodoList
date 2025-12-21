@@ -203,16 +203,24 @@ private fun TaskControlRow(
             }
 
             // Interactive Drag handle
+            var handleRectInWindow by remember { mutableStateOf<Rect?>(null) }
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .onGloballyPositioned(callbacks.onHandlePositioned)
+                    .onGloballyPositioned {
+                        handleRectInWindow = it.boundsInWindow()
+                        callbacks.onHandlePositioned(it)
+                    }
                     .pointerInput(Unit) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = callbacks.onDragStart,
                             onDragEnd = callbacks.onDragEnd,
                             onDragCancel = callbacks.onDragEnd,
-                            onDrag = { change, _ -> callbacks.onDrag(change.position) }
+                            onDrag = { change, _ ->
+                                handleRectInWindow?.let { handle ->
+                                    callbacks.onDrag(handle.topLeft + change.position)
+                                }
+                            }
                         )
                     },
                 contentAlignment = Alignment.Center
