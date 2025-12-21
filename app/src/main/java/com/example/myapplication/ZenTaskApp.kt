@@ -28,6 +28,11 @@ import com.example.myapplication.ui.sheets.AddCollectionSheet
 import com.example.myapplication.ui.sheets.AddTaskSheet
 import com.example.myapplication.ui.theme.NeumorphicColors
 import com.example.myapplication.utils.showToast
+import com.example.myapplication.ui.state.addTask
+import com.example.myapplication.ui.state.addCollection
+import com.example.myapplication.ui.state.toggleTask
+import com.example.myapplication.ui.state.deleteTask
+import com.example.myapplication.ui.state.changeTaskStatus
 import java.time.LocalDate
 import java.time.LocalDateTime
 import com.example.myapplication.utils.PerfLogger
@@ -77,6 +82,23 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
     }
 
     // Render UI
+    ZenTaskAppMainContent(
+        appState = appState,
+        tasks = tasks,
+        collections = collections,
+        collectionNameMap = collectionNameMap,
+        tasksBySelectedCollection = tasksBySelectedCollection
+    )
+}
+
+@Composable
+private fun ZenTaskAppMainContent(
+    appState: com.example.myapplication.ui.state.ZenTaskAppState,
+    tasks: List<Task>,
+    collections: List<UiCollection>,
+    collectionNameMap: Map<Int, String>,
+    tasksBySelectedCollection: List<Task>
+) {
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
             ZenTaskContent(

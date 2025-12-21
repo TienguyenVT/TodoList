@@ -27,8 +27,7 @@ fun KanbanColumnCard(
     uiState: KanbanColumnUiState,
     collections: Map<Int, String>,
     onGloballyPositioned: (LayoutCoordinates) -> Unit,
-    dragActions: DragActions,
-    taskActions: TaskActions,
+    boardActions: KanbanBoardActions,
     modifier: Modifier = Modifier
 ) {
     val targetColor by animateColorAsState(
@@ -68,8 +67,8 @@ fun KanbanColumnCard(
                         kanbanTask = kanbanTask,
                         collections = collections,
                         isBeingDragged = uiState.draggedItem == kanbanTask,
-                        dragActions = dragActions,
-                        taskActions = taskActions
+                        dragActions = boardActions.dragActions,
+                        taskActions = boardActions.taskActions
                     )
                 }
             }

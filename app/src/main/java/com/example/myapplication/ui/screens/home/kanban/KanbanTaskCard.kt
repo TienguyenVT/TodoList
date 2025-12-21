@@ -98,12 +98,7 @@ fun KanbanTaskContent(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // Top priority color line
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(priorityColor)
-        )
+        TaskPriorityIndicator(priorityColor)
 
         Column(
             modifier = Modifier
@@ -120,30 +115,55 @@ fun KanbanTaskContent(
             )
 
             // Task metadata and actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Collection Name
-                Column(modifier = Modifier.weight(1f)) {
-                    if (collectionName != null) {
-                        Text(
-                            text = stringResource(R.string.collection_prefix, collectionName),
-                            fontSize = 12.sp,
-                            color = NeumorphicColors.textSecondary
-                        )
-                    }
-                }
+            TaskMetadataRow(
+                collectionName = collectionName,
+                isCompleted = task.isCompleted,
+                isOverlay = isOverlay,
+                callbacks = callbacks
+            )
+        }
+    }
+}
 
-                // Actions and Drag Handle
-                TaskControlRow(
-                    isCompleted = task.isCompleted,
-                    isOverlay = isOverlay,
-                    callbacks = callbacks
+@Composable
+private fun TaskPriorityIndicator(color: androidx.compose.ui.graphics.Color) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .background(color)
+    )
+}
+
+@Composable
+private fun TaskMetadataRow(
+    collectionName: String?,
+    isCompleted: Boolean,
+    isOverlay: Boolean,
+    callbacks: KanbanTaskCallbacks
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Collection Name
+        Column(modifier = Modifier.weight(1f)) {
+            if (collectionName != null) {
+                Text(
+                    text = stringResource(R.string.collection_prefix, collectionName),
+                    fontSize = 12.sp,
+                    color = NeumorphicColors.textSecondary
                 )
             }
         }
+
+        // Actions and Drag Handle
+        TaskControlRow(
+            isCompleted = isCompleted,
+            isOverlay = isOverlay,
+            callbacks = callbacks
+        )
     }
 }
 

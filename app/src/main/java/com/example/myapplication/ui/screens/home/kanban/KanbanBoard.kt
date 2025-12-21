@@ -68,6 +68,11 @@ data class DragActions(
     val onEnd: () -> Unit
 )
 
+data class KanbanBoardActions(
+    val dragActions: DragActions,
+    val taskActions: TaskActions
+)
+
 @Composable
 fun KanbanBoard(
     tasks: List<Task>,
@@ -209,27 +214,29 @@ private fun KanbanColumnsLayout(
                 uiState = columnUiState,
                 collections = uiState.collections,
                 onGloballyPositioned = { coords -> callbacks.onColumnBoundsChange(column, coords.boundsInWindow()) },
-                dragActions = DragActions(
-                    onStart = { item, pointer, anchor ->
-                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        callbacks.onDragInfoChange(DragInfo(item, pointer, anchor))
-                        callbacks.onDragOverChange(uiState.columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
-                    },
-                    onDrag = { pointer ->
-                        callbacks.onDragInfoChange(uiState.dragInfo?.copy(pointerInWindow = pointer))
-                        callbacks.onDragOverChange(uiState.columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
-                    },
-                    onEnd = {
-                        val target = uiState.dragOverColumn
-                        val item = uiState.dragInfo?.item
-                        if (target != null && item != null && target != item.column) {
-                            taskActions.onStatusChange?.invoke(item.task.id, target)
+                boardActions = KanbanBoardActions(
+                    dragActions = DragActions(
+                        onStart = { item, pointer, anchor ->
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            callbacks.onDragInfoChange(DragInfo(item, pointer, anchor))
+                            callbacks.onDragOverChange(uiState.columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
+                        },
+                        onDrag = { pointer ->
+                            callbacks.onDragInfoChange(uiState.dragInfo?.copy(pointerInWindow = pointer))
+                            callbacks.onDragOverChange(uiState.columnBounds.entries.firstOrNull { (_, rect) -> rect.contains(pointer) }?.key)
+                        },
+                        onEnd = {
+                            val target = uiState.dragOverColumn
+                            val item = uiState.dragInfo?.item
+                            if (target != null && item != null && target != item.column) {
+                                taskActions.onStatusChange?.invoke(item.task.id, target)
+                            }
+                            callbacks.onDragInfoChange(null)
+                            callbacks.onDragOverChange(null)
                         }
-                        callbacks.onDragInfoChange(null)
-                        callbacks.onDragOverChange(null)
-                    }
+                    ),
+                    taskActions = taskActions
                 ),
-                taskActions = taskActions,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
