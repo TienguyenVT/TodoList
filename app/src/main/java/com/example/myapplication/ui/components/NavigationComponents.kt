@@ -14,16 +14,14 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.airbnb.lottie.compose.LottieAnimation
@@ -45,9 +43,12 @@ fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationIt
         colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
     ) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            // SỬA LỖI: Gọi trực tiếp từng NavItem thay vì dùng vòng lặp Triple gây lỗi biên dịch
-
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             NavItem(
                 icon = Icons.Filled.Home,
                 isSelected = currentScreen == NavigationItem.MY_DAY,
@@ -81,12 +82,14 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
     val catWidth = 64.dp
     val rowHorizontalPadding = 12.dp
 
-    // Root: we keep the same outer padding as the old bottom bar.
-    // The cat is drawn OUTSIDE of the Card (bottom bar) as an overlay.
+    // Giữ nguyên mức điều chỉnh độ cao (40.dp)
+    val yOffsetAdjustment = 27.dp
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp)
+            .padding(24.dp),
+        contentAlignment = Alignment.TopStart
     ) {
         val maxWidth = maxWidth
 
@@ -97,25 +100,23 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
             NavigationItem.SETTINGS -> 3
         }
 
-        var previousIndex by remember { mutableStateOf(selectedIndex) }
+        var previousIndex by remember { mutableIntStateOf(selectedIndex) }
         var facingRight by remember { mutableStateOf(true) }
 
-        // --- Coordinate calculation for the cat mascot ---
-        // The Row inside the Card uses a horizontal padding.
-        // So the actual coordinate space for the icons is: (maxWidth - 2 * rowHorizontalPadding).
-        // sectionWidth  = rowWidth / tabCount
-        // targetCenter  = rowHorizontalPadding + (index * sectionWidth) + (sectionWidth / 2)
-        // targetOffsetX = targetCenter - (catWidth / 2)
+        // --- Tính toán tọa độ ---
         val rowWidth = maxWidth - rowHorizontalPadding * 2
         val sectionWidth = rowWidth / tabCount
         val targetCenter = rowHorizontalPadding + sectionWidth * selectedIndex + sectionWidth / 2
         val targetOffsetX = targetCenter - catWidth / 2
 
+        // SỬA ĐỔI CHÍNH: Thêm hiệu ứng lắc nhẹ (Spring)
         val animatedOffsetX by animateDpAsState(
             targetValue = targetOffsetX,
             animationSpec = spring(
-                dampingRatio = 0.6f,
-                stiffness = Spring.StiffnessMediumLow
+                // 0.65f: Tạo độ nảy (overshoot) vừa phải, giúp mèo "lắc" nhẹ khi đến nơi.
+                // Nếu muốn lắc mạnh hơn thì giảm xuống 0.5f, muốn ít lắc thì tăng lên 0.8f.
+                dampingRatio = 0.65f,
+                stiffness = Spring.StiffnessMediumLow // Chuyển động mềm mại, không bị giật cục
             ),
             label = "catOffsetX"
         )
@@ -129,18 +130,7 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
             previousIndex = selectedIndex
         }
 
-        // Inertia tilt: cat leans opposite to movement direction while it is "lagging"
-        val diff = (animatedOffsetX - targetOffsetX).value
-        val maxTilt = 15f
-        val distanceForMaxTilt = sectionWidth.value.coerceAtLeast(1f)
-        val rawTilt = if (kotlin.math.abs(diff) < 0.5f) {
-            0f
-        } else {
-            (diff / distanceForMaxTilt).coerceIn(-1f, 1f) * maxTilt
-        }
-        val tiltDegrees = rawTilt.coerceIn(-maxTilt, maxTilt)
-
-        // Layer 0: bottom bar
+        // Layer 0: Thanh Bottom Bar
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(30.dp),
@@ -187,8 +177,7 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
             }
         }
 
-        // Layer 1: cat overlay ABOVE the bar.
-        // We align the cat's BOTTOM edge to the TOP edge of the Card by offsetting it by -catWidth.
+        // Layer 1: Con mèo (Overlay)
         val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cat))
         val progress by animateLottieCompositionAsState(
             composition = composition,
@@ -198,9 +187,11 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
         Box(
             modifier = Modifier
                 .size(catWidth)
-                .offset(x = animatedOffsetX, y = -catWidth)
-                .scale(scaleX = if (facingRight) 1f else -1f, scaleY = 1f)
-                .rotate(tiltDegrees),
+                .offset(x = animatedOffsetX, y = -catWidth + yOffsetAdjustment)
+                .graphicsLayer {
+                    // Chỉ lật mặt, không xoay (rotation) hay dãn (scale) phức tạp
+                    scaleX = if (facingRight) 1f else -1f
+                },
             contentAlignment = Alignment.Center
         ) {
             LottieAnimation(
@@ -214,9 +205,13 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
 @Composable
 fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.size(48.dp).clickable { onClick() },
+        modifier = Modifier
+            .size(48.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) NeumorphicColors.darkShadow.copy(0.1f) else NeumorphicColors.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) NeumorphicColors.darkShadow.copy(0.1f) else NeumorphicColors.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 4.dp)
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -233,13 +228,32 @@ fun NavItem(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
 @Composable
 fun NeumorphicFAB(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = modifier.size(64.dp).clickable { onClick() },
+        modifier = modifier
+            .size(64.dp)
+            .clickable { onClick() },
         shape = CircleShape,
         colors = CardDefaults.cardColors(containerColor = NeumorphicColors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
     ) {
-        Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(NeumorphicColors.surface, NeumorphicColors.background))), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Add, "Add", tint = NeumorphicColors.textPrimary, modifier = Modifier.size(28.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            NeumorphicColors.surface,
+                            NeumorphicColors.background
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                "Add",
+                tint = NeumorphicColors.textPrimary,
+                modifier = Modifier.size(28.dp)
+            )
         }
     }
 }

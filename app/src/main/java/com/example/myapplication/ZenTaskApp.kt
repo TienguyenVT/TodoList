@@ -80,11 +80,6 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
     // Controls when bottom navigation and FAB appear with entrance animation
     var chromeVisible by remember { mutableStateOf(false) }
 
-    // Notify activity that initial composition is ready (for splash screen coordination)
-    LaunchedEffect(Unit) {
-        onAppReady?.invoke()
-    }
-
     LaunchedEffect(currentScreen) {
         if (currentScreen != NavigationItem.COLLECTIONS) {
             showAddTaskSheet = false
@@ -103,6 +98,7 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
 
     // Delay chrome (bottom nav & FAB) entrance slightly after content
     LaunchedEffect(Unit) {
+        onAppReady?.invoke()
         delay(500)
         chromeVisible = true
     }
@@ -124,6 +120,47 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
+    val lastNonCompletedStatus = remember { mutableStateMapOf<Int, Int>() }
+
+    fun handleTaskToggle(id: Int) {
+        coroutineScope.launch {
+            try {
+                val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
+                if (current == null) {
+                    Log.w(tag, "Toggle task failed: taskId=$id not found")
+                    showToast("Không tìm thấy công việc")
+                    return@launch
+                }
+
+                val newStatus = if (current.status == 1) {
+                    lastNonCompletedStatus.remove(id) ?: 0
+                } else {
+                    lastNonCompletedStatus[id] = current.status
+                    1
+                }
+
+                withContext(Dispatchers.IO) {
+                    taskDao.update(current.copy(status = newStatus))
+                }
+            } catch (t: Throwable) {
+                Log.e(tag, "Toggle task failed: taskId=$id", t)
+                showToast("Lỗi khi cập nhật công việc")
+            }
+        }
+    }
+
+    fun handleTaskDelete(id: Int) {
+        coroutineScope.launch {
+            try {
+                lastNonCompletedStatus.remove(id)
+                withContext(Dispatchers.IO) { taskDao.deleteById(id) }
+            } catch (t: Throwable) {
+                Log.e(tag, "Delete task failed: taskId=$id", t)
+                showToast("Lỗi khi xoá công việc")
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(NeumorphicColors.background)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
@@ -131,35 +168,8 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                     NavigationItem.MY_DAY -> KanbanHomeScreen(
                         tasks = tasks,
                         collections = collectionNameMap,
-                        onTaskToggle = { id ->
-                            coroutineScope.launch {
-                                try {
-                                    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                                    if (current == null) {
-                                        Log.w(tag, "Toggle task failed: taskId=$id not found")
-                                        showToast("Không tìm thấy công việc")
-                                        return@launch
-                                    }
-
-                                    withContext(Dispatchers.IO) {
-                                        taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
-                                    }
-                                } catch (t: Throwable) {
-                                    Log.e(tag, "Toggle task failed: taskId=$id", t)
-                                    showToast("Lỗi khi cập nhật công việc")
-                                }
-                            }
-                        },
-                        onTaskDelete = { id ->
-                            coroutineScope.launch {
-                                try {
-                                    withContext(Dispatchers.IO) { taskDao.deleteById(id) }
-                                } catch (t: Throwable) {
-                                    Log.e(tag, "Delete task failed: taskId=$id", t)
-                                    showToast("Lỗi khi xoá công việc")
-                                }
-                            }
-                        },
+                        onTaskToggle = ::handleTaskToggle,
+                        onTaskDelete = ::handleTaskDelete,
                         onTaskStatusChange = { id, column ->
                             coroutineScope.launch {
                                 try {
@@ -177,6 +187,12 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                                                 current.copy(status = newStatus)
                                             )
                                         }
+
+                                        if (newStatus == 1 && current.status != 1) {
+                                            lastNonCompletedStatus[id] = current.status
+                                        } else if (newStatus != 1) {
+                                            lastNonCompletedStatus[id] = newStatus
+                                        }
                                     }
                                 } catch (t: Throwable) {
                                     Log.e(tag, "Change status failed: taskId=$id", t)
@@ -188,35 +204,8 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                     NavigationItem.CALENDAR -> CalendarScreen(
                         tasks = tasks,
                         collections = collections,
-                        onTaskToggle = { id ->
-                            coroutineScope.launch {
-                                try {
-                                    val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                                    if (current == null) {
-                                        Log.w(tag, "Toggle task failed: taskId=$id not found")
-                                        showToast("Không tìm thấy công việc")
-                                        return@launch
-                                    }
-
-                                    withContext(Dispatchers.IO) {
-                                        taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
-                                    }
-                                } catch (t: Throwable) {
-                                    Log.e(tag, "Toggle task failed: taskId=$id", t)
-                                    showToast("Lỗi khi cập nhật công việc")
-                                }
-                            }
-                        },
-                        onTaskDelete = { id ->
-                            coroutineScope.launch {
-                                try {
-                                    withContext(Dispatchers.IO) { taskDao.deleteById(id) }
-                                } catch (t: Throwable) {
-                                    Log.e(tag, "Delete task failed: taskId=$id", t)
-                                    showToast("Lỗi khi xoá công việc")
-                                }
-                            }
-                        }
+                        onTaskToggle = ::handleTaskToggle,
+                        onTaskDelete = ::handleTaskDelete
                     )
                     NavigationItem.COLLECTIONS -> CollectionsScreen(
                         collections,
@@ -337,35 +326,8 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                 collection,
                 tasksBySelectedCollection,
                 { selectedCollection = null },
-                { id ->
-                    coroutineScope.launch {
-                        try {
-                            val current = withContext(Dispatchers.IO) { taskDao.getById(id) }
-                            if (current == null) {
-                                Log.w(tag, "Toggle task failed: taskId=$id not found")
-                                showToast("Không tìm thấy công việc")
-                                return@launch
-                            }
-
-                            withContext(Dispatchers.IO) {
-                                taskDao.update(current.copy(status = if (current.status == 1) 0 else 1))
-                            }
-                        } catch (t: Throwable) {
-                            Log.e(tag, "Toggle task failed: taskId=$id", t)
-                            showToast("Lỗi khi cập nhật công việc")
-                        }
-                    }
-                },
-                { id ->
-                    coroutineScope.launch {
-                        try {
-                            withContext(Dispatchers.IO) { taskDao.deleteById(id) }
-                        } catch (t: Throwable) {
-                            Log.e(tag, "Delete task failed: taskId=$id", t)
-                            showToast("Lỗi khi xoá công việc")
-                        }
-                    }
-                }
+                ::handleTaskToggle,
+                ::handleTaskDelete
             )
         }
     }
