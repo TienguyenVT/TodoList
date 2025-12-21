@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -77,10 +78,17 @@ fun NeumorphicBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationIt
 }
 
 @Composable
-fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) -> Unit) {
-    val tabCount = 4
+fun MascotBottomNav(
+    currentScreen: NavigationItem,
+    isMenuOpen: Boolean = false,
+    dynamicSlotIcon: ImageVector? = null,
+    onMenuClick: () -> Unit,
+    onDynamicSlotClick: () -> Unit,
+    onNavigate: (NavigationItem) -> Unit
+) {
+    val tabCount = 5
     val catWidth = 64.dp
-    val rowHorizontalPadding = 12.dp
+    val rowHorizontalPadding = 5.dp
 
     // Giữ nguyên mức điều chỉnh độ cao (40.dp)
     val yOffsetAdjustment = 27.dp
@@ -88,16 +96,17 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(5.dp),
         contentAlignment = Alignment.TopStart
     ) {
         val maxWidth = maxWidth
 
-        val selectedIndex = when (currentScreen) {
-            NavigationItem.MY_DAY -> 0
-            NavigationItem.CALENDAR -> 1
-            NavigationItem.COLLECTIONS -> 2
-            NavigationItem.SETTINGS -> 3
+        // Layout: [0:Calendar] [1:Collection] [2:Home] [3:Dynamic] [4:Menu]
+        val selectedIndex = if (isMenuOpen) 4 else when (currentScreen) {
+            NavigationItem.CALENDAR -> 0
+            NavigationItem.COLLECTIONS -> 1
+            NavigationItem.MY_DAY -> 2
+            else -> 3
         }
 
         var previousIndex by remember { mutableIntStateOf(selectedIndex) }
@@ -113,10 +122,8 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
         val animatedOffsetX by animateDpAsState(
             targetValue = targetOffsetX,
             animationSpec = spring(
-                // 0.65f: Tạo độ nảy (overshoot) vừa phải, giúp mèo "lắc" nhẹ khi đến nơi.
-                // Nếu muốn lắc mạnh hơn thì giảm xuống 0.5f, muốn ít lắc thì tăng lên 0.8f.
                 dampingRatio = 0.65f,
-                stiffness = Spring.StiffnessMediumLow // Chuyển động mềm mại, không bị giật cục
+                stiffness = Spring.StiffnessMediumLow
             ),
             label = "catOffsetX"
         )
@@ -143,35 +150,63 @@ fun MascotBottomNav(currentScreen: NavigationItem, onNavigate: (NavigationItem) 
                     .padding(horizontal = rowHorizontalPadding, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    NavItem(
-                        icon = Icons.Filled.Home,
-                        isSelected = currentScreen == NavigationItem.MY_DAY,
-                        onClick = { onNavigate(NavigationItem.MY_DAY) }
-                    )
-                }
-
+                // 0: Calendar
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     NavItem(
                         icon = Icons.Filled.DateRange,
-                        isSelected = currentScreen == NavigationItem.CALENDAR,
+                        isSelected = !isMenuOpen && currentScreen == NavigationItem.CALENDAR,
                         onClick = { onNavigate(NavigationItem.CALENDAR) }
                     )
                 }
 
+                // 1: Collections
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     NavItem(
                         icon = Icons.Filled.List,
-                        isSelected = currentScreen == NavigationItem.COLLECTIONS,
+                        isSelected = !isMenuOpen && currentScreen == NavigationItem.COLLECTIONS,
                         onClick = { onNavigate(NavigationItem.COLLECTIONS) }
                     )
                 }
 
+                // 2: Home (My Day)
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     NavItem(
-                        icon = Icons.Filled.Settings,
-                        isSelected = currentScreen == NavigationItem.SETTINGS,
-                        onClick = { onNavigate(NavigationItem.SETTINGS) }
+                        icon = Icons.Filled.Home,
+                        isSelected = !isMenuOpen && currentScreen == NavigationItem.MY_DAY,
+                        onClick = { onNavigate(NavigationItem.MY_DAY) }
+                    )
+                }
+
+                // 3: Dynamic Slot
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                     val isDynamicSelected = !isMenuOpen && 
+                                          currentScreen != NavigationItem.CALENDAR && 
+                                          currentScreen != NavigationItem.COLLECTIONS && 
+                                          currentScreen != NavigationItem.MY_DAY
+
+                    if (dynamicSlotIcon != null) {
+                        NavItem(
+                            icon = dynamicSlotIcon,
+                            isSelected = isDynamicSelected,
+                            onClick = { onDynamicSlotClick() }
+                        )
+                    } else {
+                        // Empty placeholder
+                        Box(
+                             modifier = Modifier
+                                 .size(48.dp)
+                                 .clickable { onDynamicSlotClick() }, 
+                             contentAlignment = Alignment.Center
+                        ) {}
+                    }
+                }
+
+                // 4: Menu Trigger
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    NavItem(
+                        icon = Icons.Filled.Menu,
+                        isSelected = isMenuOpen,
+                        onClick = { onMenuClick() }
                     )
                 }
             }

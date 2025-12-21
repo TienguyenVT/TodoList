@@ -37,6 +37,7 @@ import com.example.myapplication.ui.screens.*
 import com.example.myapplication.ui.screens.home.kanban.KanbanHomeScreen
 import com.example.myapplication.ui.screens.home.kanban.KanbanColumn
 import com.example.myapplication.ui.screens.calendar.CalendarScreen
+import com.example.myapplication.ui.components.FloatingCommandDeck
 import com.example.myapplication.ui.sheets.AddCollectionSheet
 import com.example.myapplication.ui.sheets.AddTaskSheet
 import com.example.myapplication.ui.theme.NeumorphicColors
@@ -79,6 +80,12 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
 
     // Controls when bottom navigation and FAB appear with entrance animation
     var chromeVisible by remember { mutableStateOf(false) }
+
+    // Toggle for the Floating Command Deck (Menu)
+    var isMenuVisible by remember { mutableStateOf(false) }
+    
+    // Dynamic Slot State
+    var dynamicSlotItem by remember { mutableStateOf<NavigationItem?>(null) }
 
     LaunchedEffect(currentScreen) {
         if (currentScreen != NavigationItem.COLLECTIONS) {
@@ -226,8 +233,54 @@ fun ZenTaskApp(onAppReady: (() -> Unit)? = null) {
                     animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
                 )
             ) {
-                MascotBottomNav(currentScreen) { currentScreen = it }
+                MascotBottomNav(
+                    currentScreen = currentScreen,
+                    isMenuOpen = isMenuVisible,
+                    dynamicSlotIcon = dynamicSlotItem?.let { 
+                        when (it) {
+                             NavigationItem.SETTINGS -> Icons.Filled.Settings
+                             else -> null
+                        }
+                    },
+                    onMenuClick = { isMenuVisible = !isMenuVisible },
+                    onDynamicSlotClick = { 
+                        if (dynamicSlotItem != null) {
+                            currentScreen = dynamicSlotItem!!
+                        } else {
+                            // If empty, click opens the menu to let user choose
+                            isMenuVisible = true
+                        }
+                    },
+                    onNavigate = { item ->
+                        isMenuVisible = false
+                        currentScreen = item
+                    }
+                )
             }
+        }
+
+        // Floating Command Deck (Menu)
+        // Anchor: BottomEnd with padding to appear above the 4th tab
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 90.dp, end = 24.dp),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            FloatingCommandDeck(
+                isVisible = isMenuVisible && chromeVisible,
+                onDismiss = { isMenuVisible = false },
+                onSettingsClick = {
+                    isMenuVisible = false
+                    dynamicSlotItem = NavigationItem.SETTINGS
+                    currentScreen = NavigationItem.SETTINGS
+                },
+                onLogoutClick = {
+                    isMenuVisible = false
+                    // TODO: Implement logout logic
+                    showToast("Logout Clicked")
+                }
+            )
         }
 
         if (currentScreen == NavigationItem.COLLECTIONS) {
